@@ -162,6 +162,86 @@ Readings:
    ceiling is below it. Closing the gap is the loop-machinery agenda
    (re-entrant perception), not just a bigger stem.
 
+## COMPLETED 2026-07-20 (same-day, local, $0): test-time codebook
+## consolidation — toy smoke (toy_codebook_icl.py)
+
+New direction (Ibanis): move learning from backprop into TEST-TIME
+codebook development — a persistent store edited by a hardcoded rule
+(online k-means: assign + count-capped running mean = literal gradient
+descent on distortion, no backprop), meta-trained so codebook edits are
+the only path to reward. Harness: LIFETIME = L episodes over the SAME 6
+held-out classes; labels re-permuted per episode (binding unsmearable);
+classes recur across episodes (recurrence capturable ONLY by the
+codebook — weights never saw the classes, cards wipe per episode).
+Two-stage read: percept -> code ("what is this") -> card ("what was it
+called here"). Metric: final-step probe top1 vs EPISODE INDEX within
+lifetime, frozen weights — a rising curve IS gradient-free learning.
+Arms: live (edits on) / frozen (edits off) / oracle (codes = true
+encoded class means) / nocode (cards from raw percepts = current
+architecture).
+
+Seven-version iteration (~2.5 h wall, all local; full log in the
+script docstring): v0 random-init snapping (fragmentation; live ~=
+nocode) -> v1 novelty-gated birth (WORKS: 61->67, but over-births) ->
+v1b lower bar (collisions, ~nocode) -> v2 bar-merge (never fires) ->
+v3 witness-merge (fires, breaks the anneal) -> v4/v4b tombstones
+(structure perfect, accuracy worse) -> v5 soft mixture content
+(Ibanis's proposal: pass a similarity-softmax MIXTURE over codes to
+cards/queries instead of the nearest code) — DECISIVE:
+
+    arm      ep0 -> ep11 (l-eval 12)     ep23 (l-eval 24, same weights)
+    live       63.2 -> 69.8 (+6.6)         76.8 (+12 net, still rising)
+    nocode     53 flat                     53 flat
+    frozen     ~22                         ~22
+    oracle     86-88                       87
+
+Readings:
+1. **Test-time learning via codebook development is real and
+   substantial**: +12 pts over a 24-episode lifetime with weights
+   FROZEN, 4x past the meta-training horizon (6-ep lifetimes), no
+   plateau; oracle gap halved. The codebook is the only moving part.
+2. **The birth/collision asymmetry**: over-birthing (dup codes) =
+   dilution = recoverable; under-birthing (two classes in one code) =
+   permanent (no split op). Err toward birthing.
+3. **Capacity exhaustion IS the anneal**: birth-liberal while slots
+   remain (exploration, avoids collisions) -> join-forced when full
+   (consolidation). v1's accidental fixed point; every attempt to
+   "improve" it structurally (v3/v4/v6 merge+tombstone) lost accuracy.
+4. **Interface beats structure**: slot bookkeeping (used-codes,
+   write/read agreement) DECOUPLES from accuracy; the fragmentation
+   cost was always vector noise at the content interface, fixed by the
+   soft mixture, not by tidying slots. Under soft content a duplicate
+   POPULATION is a richer estimator than its merged collapse —
+   duplicates are an asset at the soft interface.
+5. **Meta-train under the full deployment protocol**: v4's accuracy
+   decayed starting EXACTLY at the training-horizon episode (its rule
+   kept developing the book into regimes training never produced); v5
+   extrapolates freely because saturated-book drift is smooth.
+6. Validated design (v6b, Ibanis's config): hard-assign updates +
+   birth-until-full + soft mixture content + LAZY bar-merge, no
+   tombstones — live 61.9 -> 70.1, best slope (+8.2). The bar
+   trigger's lateness (fatal under hard content) is correct under
+   soft: it merges only mature duplicate pairs, where the collapse is
+   ~mixture-invariant. Aggressive structure (witness/tombstone) loses
+   ~6 pts; CONFIDENT structure is free. Open wart: theta is a fixed
+   threshold in a learned space (calibrated post hoc).
+
+REAL-SPACE PRE-CHECK (check_dino_headroom.py, local, $0): the premise
+measured on held-out IN-100 in frozen DINOv2-S space, before renting
+anything. Same/cross-class cos 0.361/0.021 (CLS) — the toy's noise
+regime (0.33/0.00) is DINO's actual regime, not a rig. 20-way k-shot:
+prototype-of-k 77.5 (k=1) -> 94.8 (k=25), +17 pts consolidation
+headroom (patch-mean percepts: 63 -> 88, +25); prototype beats
+k-nearest-exemplar at every k>=2 (+3.2 CLS / +5.0 patch at k=25)
+while storing 1 vector vs k. Consolidation beats memory in real
+feature space; noisier percepts -> larger codebook payoff (percept
+pooling is now an informed design knob).
+
+Next: the real-data version — DINO tokens, lifetimes over held-out
+IN-100 classes, the train_vocab_icl harness with a persistent
+v6b-rule codebook; measure the within-lifetime learning curve at
+scale against the measured +17-pt headroom budget.
+
 ## Local environment (Windows)
 
 - No `python` on PATH. Project env is the `ToastEnv` conda env:
