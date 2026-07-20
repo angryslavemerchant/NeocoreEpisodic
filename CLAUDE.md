@@ -59,7 +59,7 @@ public) is the cross-session thinking log; read it after this file.
    documented in train_vocab_icl.py's docstring); the oracle-arm
    dissociation (1.00 / 0.34 / 0.32) is what justified the launch.
 
-## CURRENT EXPERIMENT (specced 2026-07-20, not yet built): from-scratch episodic foveated learner
+## COMPLETED 2026-07-20 (overnight run, results below): from-scratch episodic foveated learner
 
 Remove DINO. Learn perception + selection + memory END TO END from raw
 pixels under the episodic binding objective. The aux read loss ("two
@@ -112,6 +112,55 @@ Design:
   RAM-resident). 4 arms x 150 ep ≈ 4-6 h ≈ $2-3. Smoke locally first:
   shrunken-world toy (icl.N_POS patching pattern) with a synthetic
   pixel lake; oracle-equivalent = signature patches.
+
+### RESULTS (train_pixel_icl.py, wandb project neocore-pix, artifact
+pix-icl-1ciu6b6l:v0 — checkpoints + 64 admission maps + summary; run
+on m9105, ~13 h, ~$4.3; actual ~65-75 s/epoch)
+
+Toy smoke (local, $0): locality zero-grad PASS; dissociation oracle
+94.3 >> topk 61.9 > sampled 32.8 > random 22.3 (chance 16.7).
+
+Cloud (best top1, chance 16.7, 20 held-out classes; stem probe =
+post-hoc attentive IN-100 probe on frozen stem, 400 img/class subset):
+
+    arm       best_top1   stem_probe
+    sampled     39.60       37.90
+    random      39.11       38.86
+    topk        31.84       36.52     (peaked ~ep41 then DEGRADED to 27)
+    dino        81.01        (93.5 known)
+    randinit      —         21.66
+
+Readings:
+1. **The full loop works from pixels**: all scratch arms are far above
+   chance with zero pretrained components — perception + selection +
+   memory learned end to end under episodic binding alone.
+2. **Success criteria**: (a) above chance yes, closing toward dino NO
+   (39.6 vs 81.0 — the gap is the next frontier); (b) sampled >= both
+   topk and random CONFIRMED (39.60 > 39.11 >> 31.84), though the
+   sampled-vs-random margin is narrow (+0.5); (c) stem probe >>
+   randinit probe CONFIRMED (+16-17 pts) — episodic pressure MINTS
+   features. 37.9-38.9 also beats the best pixel-era encoder (35.5).
+3. **Topk actively collapses from scratch** (31.8 peak -> 27 final):
+   greedy selection + learned features co-collapse into a narrow loop;
+   sampling is what keeps the feature-learning diet diverse. The
+   temperature dial finding, now with a mechanism.
+4. **tau drifts UP in the scratch sampled arm** (1.00 -> 1.22): the
+   learned policy chooses MORE diversity when features are weak; the
+   dino arm's tau stays ~1.0. Diversity demand scales inversely with
+   feature quality.
+5. **random's stem probes best** (38.86 > 37.90 sampled): broadest
+   coverage = richest feature diet, but its bindings retrieve slightly
+   worse. Selection quality and feature curriculum are separable
+   objectives — first direct evidence.
+6. **Admission maps** (the program's wanted instrument): scratch arms
+   forage as a covering code with mild object affinity; the dino arm
+   visibly clusters ON objects (birds, keyboards, faces). Feature
+   quality is directly visible as foveation quality.
+7. **The anchor is generous**: DINO tokens are ViT-contextualized
+   (each token saw the whole image), so 81.0 includes a globality
+   subsidy a per-patch stem can never match; the honest scratch
+   ceiling is below it. Closing the gap is the loop-machinery agenda
+   (re-entrant perception), not just a bigger stem.
 
 ## Local environment (Windows)
 
