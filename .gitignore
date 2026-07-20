@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+data/
+jpeg_cache/
+checkpoints*/
+viz_*/
+Results/
+wandb/
+runs/
+artifacts/
+
+# agent-local thinking log — private, never commit (repo is public)
+POINTS_OF_INTEREST.md
+
+# Vast.ai automation — never commit these
+vast/secrets.env
+.vast/
