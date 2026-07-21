@@ -72,7 +72,8 @@ P = 32                  # primitives (= meanings)
 EPS = 8                 # episodes per lifetime
 SPE = 4                 # primitives studied per episode
 QN = 6                  # queries per episode (2 within / 2 cross / 2 mixed)
-OUT = 4                 # answer slots
+OUT = 6                 # answer slots (3 primitives x up to 2 reps)
+QSLOTS = 6              # query tokens: p1 m1 p2 m2 p3 m3
 PAD_CLS = 32            # output class for padding (classes 0..32)
 TOK_TWICE, TOK_NOOP, TOK_SLOT, TOK_PAD = 64, 65, 66, 67
 VOCAB = 68              # forms 0-31, meanings 32-63, specials
@@ -178,8 +179,17 @@ class LexModel(nn.Module):
         super().__init__()
         self.use_book, self.ctx_mode, self.d = use_book, ctx_mode, d
         self.emb = nn.Embedding(VOCAB, d)
-        seq = (2 * SPE if ctx_mode == "episode" else 2 * P) + 4 + OUT
-        self.pos = nn.Parameter(torch.randn(seq, d) * 0.02)
+        seq = (2 * SPE if ctx_mode == "episode" else 2 * P) + QSLOTS + OUT
+        # FIXED sinusoidal positions (architectural constant, not learned):
+        # length generalization must be graded on the composition circuit,
+        # not on untrained per-slot position embeddings.
+        pos = torch.zeros(seq, d)
+        t = torch.arange(seq).unsqueeze(1).float()
+        div = torch.exp(torch.arange(0, d, 2).float()
+                        * (-torch.log(torch.tensor(10000.0)) / d))
+        pos[:, 0::2] = torch.sin(t * div)
+        pos[:, 1::2] = torch.cos(t * div)
+        self.register_buffer("pos", pos * 0.3)
         self.blocks = nn.ModuleList(Block(d, heads) for _ in range(layers))
         self.norm = nn.LayerNorm(d)
         self.head = nn.Linear(d, PAD_CLS + 1)
@@ -193,13 +203,16 @@ class LexModel(nn.Module):
         toks = torch.cat([ctx_tokens, q_tokens, slots], dim=2)
         x = self.emb(toks.reshape(E * Q, -1))
         if self.use_book and book is not None:
-            # book read for the two query-primitive positions
-            prims = q_tokens[:, :, [0, 2]]                    # (E,Q,2)
-            qv = self.emb(prims)                              # (E,Q,2,d)
-            pay = book.read(qv.reshape(E, Q * 2, -1)).reshape(E, Q, 2, -1)
+            # book read for up to three query-primitive positions; PAD
+            # placeholders (absent third word) read nothing
+            prims = q_tokens[:, :, [0, 2, 4]]                 # (E,Q,3)
+            valid = (prims < P).unsqueeze(-1).float()
+            qv = self.emb(prims.clamp(max=P - 1))
+            pay = book.read(qv.reshape(E, Q * 3, -1)).reshape(E, Q, 3, -1)
+            pay = pay * valid
             x = x.reshape(E, Q, -1, self.d)
-            x[:, :, C] = x[:, :, C] + pay[:, :, 0]
-            x[:, :, C + 2] = x[:, :, C + 2] + pay[:, :, 1]
+            for k in range(3):
+                x[:, :, C + 2 * k] = x[:, :, C + 2 * k] + pay[:, :, k]
             x = x.reshape(E * Q, -1, self.d)
         x = x + self.pos[: x.shape[1]]
         for b in self.blocks:
@@ -220,19 +233,20 @@ def make_lifetime(E, device):
 HOLDOUT_TWICE = 8       # forms 0..7: never modified by TWICE in training
 
 
-def make_episode(lex, sched, e, device, holdout=False):
+def make_episode(lex, sched, e, device, holdout=False, three=False):
     """Returns study pairs, query tokens, targets (E,QN,OUT), and a
     per-output-position origin map: 0=within, 1=cross, 2=pad.
     holdout=True (training only): forms < HOLDOUT_TWICE never receive
-    TWICE — the add-jump split. At eval, unconstrained queries measure
-    whether the factorization yields systematicity for free."""
+    TWICE — the add-jump split. three=True: 3-primitive queries (the
+    LENGTH split: training uses only 2-primitive queries; eval also
+    poses 3-primitive ones — productivity)."""
     E = lex.shape[0]
     now = sched[:, e]                                       # (E,SPE)
-    ridx = torch.randint(0, SPE, (E, 6), device=device)
+    ridx = torch.randint(0, SPE, (E, 9), device=device)
     w_pool = now.gather(1, ridx)                            # within picks
     if e > 0:
         past = sched[:, :e].reshape(E, e * SPE)
-        cidx = torch.randint(0, e * SPE, (E, 6), device=device)
+        cidx = torch.randint(0, e * SPE, (E, 9), device=device)
         c_pool = past.gather(1, cidx)
         is_cross_possible = True
     else:
@@ -243,39 +257,51 @@ def make_episode(lex, sched, e, device, holdout=False):
                       c_pool[:, 1], w_pool[:, 2], c_pool[:, 4]], dim=1)
     p2 = torch.stack([w_pool[:, 3], w_pool[:, 4], c_pool[:, 2],
                       c_pool[:, 3], c_pool[:, 5], w_pool[:, 5]], dim=1)
+    p3 = torch.stack([w_pool[:, 6], c_pool[:, 6], w_pool[:, 7],
+                      c_pool[:, 7], w_pool[:, 8], c_pool[:, 8]], dim=1)
     o1 = torch.tensor([0, 0, 1, 1, 0, 1], device=device)
     o2 = torch.tensor([0, 0, 1, 1, 1, 0], device=device)
+    o3 = torch.tensor([0, 1, 0, 1, 0, 1], device=device)
     if not is_cross_possible:
         o1 = torch.zeros_like(o1)
         o2 = torch.zeros_like(o2)
-    mods = torch.randint(0, 2, (E, QN, 2), device=device)   # 0 NOOP 1 TWICE
+        o3 = torch.zeros_like(o3)
+    mods = torch.randint(0, 2, (E, QN, 3), device=device)   # 0 NOOP 1 TWICE
     if holdout:
-        mods[:, :, 0] = torch.where(p1 < HOLDOUT_TWICE,
-                                    torch.zeros_like(mods[:, :, 0]),
-                                    mods[:, :, 0])
-        mods[:, :, 1] = torch.where(p2 < HOLDOUT_TWICE,
-                                    torch.zeros_like(mods[:, :, 1]),
-                                    mods[:, :, 1])
-    q_tokens = torch.stack(
-        [p1, torch.where(mods[:, :, 0] == 1, TOK_TWICE, TOK_NOOP),
-         p2, torch.where(mods[:, :, 1] == 1, TOK_TWICE, TOK_NOOP)],
-        dim=2)                                              # (E,QN,4)
+        for k, pk in ((0, p1), (1, p2), (2, p3)):
+            mods[:, :, k] = torch.where(pk < HOLDOUT_TWICE,
+                                        torch.zeros_like(mods[:, :, k]),
+                                        mods[:, :, k])
+    mt = [torch.where(mods[:, :, k] == 1, TOK_TWICE, TOK_NOOP)
+          for k in range(3)]
+    if three:
+        q_tokens = torch.stack([p1, mt[0], p2, mt[1], p3, mt[2]], dim=2)
+    else:
+        pad = torch.full_like(p1, TOK_PAD)
+        q_tokens = torch.stack([p1, mt[0], p2, mt[1], pad, pad], dim=2)
     m1 = lex.gather(1, p1)
     m2 = lex.gather(1, p2)
+    m3 = lex.gather(1, p3)
     r1 = 1 + mods[:, :, 0]
     r2 = 1 + mods[:, :, 1]
+    r3 = (1 + mods[:, :, 2]) if three else torch.zeros_like(r1)
     pos = torch.arange(OUT, device=device).view(1, 1, OUT)
     tgt = torch.full((E, QN, OUT), PAD_CLS, dtype=torch.long, device=device)
     o_map = torch.full((E, QN, OUT), 2, dtype=torch.long, device=device)
     in1 = pos < r1.unsqueeze(-1)
     in2 = (pos >= r1.unsqueeze(-1)) & (pos < (r1 + r2).unsqueeze(-1))
+    in3 = (pos >= (r1 + r2).unsqueeze(-1)) \
+        & (pos < (r1 + r2 + r3).unsqueeze(-1))
     tgt = torch.where(in1, m1.unsqueeze(-1), tgt)
     tgt = torch.where(in2, m2.unsqueeze(-1), tgt)
+    tgt = torch.where(in3, m3.unsqueeze(-1), tgt)
     o_map = torch.where(in1, o1.view(1, QN, 1).expand(E, QN, OUT), o_map)
     o_map = torch.where(in2, o2.view(1, QN, 1).expand(E, QN, OUT), o_map)
+    o_map = torch.where(in3, o3.view(1, QN, 1).expand(E, QN, OUT), o_map)
     nov1 = ((p1 < HOLDOUT_TWICE) & (mods[:, :, 0] == 1)).unsqueeze(-1)
     nov2 = ((p2 < HOLDOUT_TWICE) & (mods[:, :, 1] == 1)).unsqueeze(-1)
-    novel = (in1 & nov1) | (in2 & nov2)          # held-out combinations
+    nov3 = ((p3 < HOLDOUT_TWICE) & (mods[:, :, 2] == 1)).unsqueeze(-1)
+    novel = (in1 & nov1) | (in2 & nov2) | (in3 & nov3)
     return now, q_tokens, tgt, o_map, novel
 
 
@@ -348,6 +374,15 @@ def run_lifetime(model, E, device, K, training, arm="live",
             st["novel"] = (float(ok[novel].mean()) if novel.any()
                            else float("nan"))
             st["exact"] = float((pred == tgt).all(-1).float().mean())
+            if not training:
+                # the LENGTH split: 3-primitive queries, never trained
+                _, q3, t3, _, _ = make_episode(lex, sched, e, device,
+                                               three=True)
+                l3 = model(ctx, q3, book=book)
+                pr3 = l3.argmax(-1)
+                st["len3"] = float((pr3 == t3).float().mean())
+                st["len3_exact"] = float(
+                    (pr3 == t3).all(-1).float().mean())
             if book is not None:
                 st["used"] = float((book.counts > 0).float().sum(1).mean())
                 st["merges"] = float(book.merges.mean())
@@ -383,7 +418,8 @@ def train(model, steps, E, lr, device, K, tag, arm="live", log_every=200,
 def eval_arm(model, E, device, K, arm, batches, cap_eps=None):
     model.eval()
     acc = {k: torch.zeros(EPS) for k in ("within", "cross", "novel",
-                                         "exact", "used", "merges")}
+                                         "exact", "len3", "len3_exact",
+                                         "used", "merges")}
     cnt = {k: torch.zeros(EPS) for k in acc}
     for _ in range(batches):
         _, stats = run_lifetime(model, E, device, K, False, arm=arm,
@@ -494,7 +530,9 @@ def main():
         print(f"  {n:>8s}: cross {c.mean().item():5.1f}  "
               f"within {w.mean().item():5.1f}  "
               f"novel-combo {arms[n]['novel'].mean().item() * 100:5.1f}  "
-              f"exact {arms[n]['exact'].mean().item() * 100:5.1f}")
+              f"LEN3 {arms[n]['len3'].mean().item() * 100:5.1f}  "
+              f"len3-exact {arms[n]['len3_exact'].mean().item() * 100:5.1f}"
+              f"  exact {arms[n]['exact'].mean().item() * 100:5.1f}")
 
     if args.out:
         import matplotlib
