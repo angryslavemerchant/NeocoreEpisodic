@@ -165,8 +165,11 @@ def main():
 
         def partial_load(model, path):
             sd = torch.load(path, map_location="cpu")
+            msd = model.state_dict()
+            # keep only shape-compatible tensors: label_emb/head are
+            # N-way-sized, code_init is K-sized — all reinit cleanly
             sd = {k: v for k, v in sd.items()
-                  if not k.startswith(("label_emb", "head"))}
+                  if k in msd and msd[k].shape == v.shape}
             missing, _ = model.load_state_dict(sd, strict=False)
             print(f"warm-start {os.path.basename(path)}: {len(sd)} "
                   f"tensors; reinit "
