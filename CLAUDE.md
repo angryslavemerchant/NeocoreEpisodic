@@ -237,10 +237,28 @@ while storing 1 vector vs k. Consolidation beats memory in real
 feature space; noisier percepts -> larger codebook payoff (percept
 pooling is now an informed design knob).
 
+Same-evening addendum (v7/v7b, Ibanis's "codes take up energy"): the
+DP-means energy rule — ONE constant lam = rent per code; birth iff
+distortion saved > rent, merge iff exact collapse cost (ni*nj/(ni+nj)
+* ||ci-cj||^2) < rent — derives lazy merging from first principles
+but FAILED twice on developmental dynamics: fixed rent bankrupts the
+infant encoder geometry (v7: book pinned at 1 code, even oracle
+collapsed — the model meta-trained around a degenerate store);
+quantile-adaptive rent poisons itself on novelty (v7b: early record =
+cross-class first-glances -> rent spike -> self-demolition, rebuild
+too slow). Principle: test-time rules must be viable while the
+geometry/record is immature, and adaptive statistics must be
+insulated from the decisions they govern. Rent IS the granularity
+dial of the ontology (rate-distortion Lagrangian; K becomes emergent,
+lam sweeps = "at what grain does the world want to be known") — the
+right formulation, parked until the geometry is frozen.
+
 Next: the real-data version — DINO tokens, lifetimes over held-out
 IN-100 classes, the train_vocab_icl harness with a persistent
 v6b-rule codebook; measure the within-lifetime learning curve at
-scale against the measured +17-pt headroom budget.
+scale against the measured +17-pt headroom budget. Fixed-lam energy
+rule as a cheap second arm THERE: frozen DINO percepts have no
+infancy, so v7's failure mode structurally cannot occur.
 
 ## Local environment (Windows)
 

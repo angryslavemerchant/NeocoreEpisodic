@@ -185,6 +185,69 @@ consolidation headroom; patch-mean: 63 -> 88, +25); prototype beats
 k-nearest-exemplar at every k>=2 (+3.2 CLS / +5.0 patch at k=25) while
 storing 1 vector vs k. Consolidation beats memory in real space;
 noisier percepts -> bigger codebook payoff.
+
+9. v7 (--lam, Ibanis's "codes take up energy"): replace both
+   thresholds with ONE constant — DP-means. Objective: distortion +
+   lam * (#codes); every rule is a theorem of it. Birth iff min
+   squared glance-to-code distance > lam (distortion saved beats
+   rent; on normalized vectors this IS the theta rule, theta =
+   1 - lam/2). Merge i,j iff (ni*nj/(ni+nj)) * ||ci-cj||^2 < lam —
+   the EXACT distortion cost of the collapse, computable from stored
+   counts+centroids. Intrinsically confidence-gated: noisy fresh
+   duplicates wait, converged mature ones merge — the lazy-merge
+   lesson derived instead of hand-tuned. Same open wart (lam is a
+   constant in a learned space); the escalation paths are quantile
+   self-calibration or per-code variance (Bayesian birth).
+   [v7 result: CATASTROPHIC TRAINING FAILURE, mechanism instructive.
+   At init the encoder cone's distances (~30) sit under lam=70 ->
+   nothing births; and unlike theta-only rules (one-way door — loss
+   pressure can spread the geometry past a bad bar and progress
+   STICKS), the energy merge is a two-way door: any code the
+   spreading geometry births is instantly liquidated (two nearby
+   small-count codes = dirt-cheap collapse). The rule that is optimal
+   GIVEN a geometry is anti-optimal while the geometry is being
+   built. Book pinned at used=1.00 for entire 24-ep lifetimes; live
+   30 < nocode 53; even oracle collapsed to 59 (encoder meta-trained
+   around a degenerate book never learned code-shaped reads).
+   PRINCIPLE: a test-time rule must be developmentally viable, not
+   just asymptotically optimal — a fixed price bankrupts the infant
+   economy. The fix, if pursued: lam as a fixed QUANTILE of recent
+   glance-to-code distances (procedure constant, value tracks the
+   geometry).]
+10. v7b (--lam-q): quantile rent. Each lifetime records its observed
+   glance-to-nearest-code squared distances; lam_t = the q-quantile
+   of that record (per lifetime, running). The PROCEDURE is the
+   architectural constant; the price floats with the geometry. Free
+   consequences: empty record -> rent ~0 -> infant book births
+   liberally (the recoverable direction) and CANNOT merge (cost <
+   ~0 never fires) — liberal infancy + one-way doors fall out of the
+   definition instead of being scheduled. Risk to watch: the
+   threshold is now a function of encoder outputs, so meta-training
+   could in principle game it (constants-law exposure).
+   [v7b result: FAILS, third distinct mechanism — NOVELTY POISONS THE
+   RECORD. A fresh lifetime's first observed nearest-distances are
+   first-glances-of-new-classes (cross-scale, ~120); the quantile
+   activates on that polluted record, rent spikes, every merge looks
+   cheap, the book demolishes to ~1 code by ep 2 (used 4.1 -> 1.35),
+   then painstakingly rebuilds (9.2 by ep 23) as ordinary join
+   distances dilute the record. live 40 -> 49, BELOW nocode (54)
+   throughout. The self-reference problem in its pure form: the
+   statistic is polluted by the events it governs — novelty inflates
+   the rent that then punishes novelty's consequences. Known fix
+   (record join distances only, not birth-triggering ones) NOT
+   pursued — third patch on the line, epicycle territory.
+
+ENERGY-LINE VERDICT: the objective is right (it derived lazy merging
+from first principles) but both implementations failed on
+developmental dynamics: fixed rent bankrupts the infant geometry
+(v7), self-calibrating rent poisons itself on novelty (v7b). Rules
+that price structure must be viable WHILE the geometry/record is
+immature, and every adaptive statistic must be insulated from the
+decisions it governs. Carry to the real experiment: v6b as the
+validated rule; fixed-lam energy as a cheap second arm ONLY there —
+frozen DINO percepts have no infancy (the geometry is adult and
+measured: same/cross d^2 ~ 82/125 per check_dino_headroom), so v7's
+failure mode structurally cannot occur.]
 """
 
 import argparse
@@ -247,7 +310,8 @@ def make_episode(world, cls, device):
 class ToyBinder(nn.Module):
     def __init__(self, d_in, d=64, k=16, use_codes=True, cap=32,
                  theta=0.45, theta_merge=0.0, merge_mode="off",
-                 tombstone=False, content="hard", code_temp=10.0):
+                 tombstone=False, content="hard", code_temp=10.0,
+                 lam=0.0, lam_q=0.0):
         super().__init__()
         self.use_codes, self.k, self.cap, self.theta = use_codes, k, cap, \
             theta
@@ -256,6 +320,8 @@ class ToyBinder(nn.Module):
         self.tombstone = tombstone              # merged-away slots stay dead
         self.content = content                  # hard snap | soft mixture
         self.code_temp = code_temp              # soft mixture sharpness
+        self.lam = lam                          # >0: DP-means energy rule
+        self.lam_q = lam_q                      # >0: rent = running quantile
         self.enc = nn.Sequential(nn.Linear(d_in, 128), nn.GELU(),
                                  nn.Linear(128, d), nn.LayerNorm(d))
         self.label_emb = nn.Embedding(N_WAY, d)
@@ -274,6 +340,8 @@ class ToyBinder(nn.Module):
         self.counts = torch.zeros(E, self.k, device=device)
         self.merges = torch.zeros(E, device=device)
         self.dead = torch.zeros(E, self.k, dtype=torch.bool, device=device)
+        self.dstats = torch.full((E, 256), float("nan"), device=device)
+        self.dn = torch.zeros(E, dtype=torch.long, device=device)
 
     def _sims(self, v):
         return torch.einsum("ed,ekd->ek", F.normalize(v, dim=-1),
@@ -298,6 +366,8 @@ class ToyBinder(nn.Module):
         ||v - c||^2 with lr 1/min(n, cap)); no backprop touches the
         codebook (asserted in main)."""
         v = v.detach()
+        if self.lam > 0 or self.lam_q > 0:
+            return self._energy_write(v)
         used = self.counts > 0
         sim = self._sims(v)
         neg = torch.finfo(sim.dtype).min
@@ -331,6 +401,62 @@ class ToyBinder(nn.Module):
             t2v, t2i = sim_u.topk(2, dim=1)
             do = (~birth) & (t2v[:, 1] > self.theta)
             i = self._merge(ar, i, t2i[:, 1], do)
+        if self.content == "soft":
+            return self._soft_content(v), i
+        return self.codes[ar, i].clone(), i
+
+    @torch.no_grad()
+    def _energy_write(self, v):
+        """v7: DP-means. ONE constant lam = rent per code, all rules
+        theorems of  distortion + lam * #codes.  Birth iff min sq
+        distance > lam (distortion saved beats rent). After the write,
+        merge the touched code with its nearest used neighbor iff the
+        EXACT distortion cost of the collapse — (ni*nj/(ni+nj)) *
+        ||ci-cj||^2, closed form from stored counts+centroids — is
+        below the rent it frees. Confidence-gating falls out: noisy
+        fresh duplicates are far apart (wait), converged mature ones
+        are close (merge)."""
+        E, dev = v.shape[0], v.device
+        ar = torch.arange(E, device=dev)
+        used = self.counts > 0
+        big = torch.finfo(v.dtype).max
+        d2 = ((v.unsqueeze(1) - self.codes) ** 2).sum(-1)
+        d2u = d2.masked_fill(~used, big)
+        best, bestv = d2u.argmin(1), d2u.min(1).values
+        if self.lam_q > 0:
+            # v7b: rent = running q-quantile of this lifetime's observed
+            # nearest distances; ~0 while the record is thin (liberal
+            # infant births, no infant merges)
+            lam = torch.where(
+                self.dn >= 4,
+                torch.nanquantile(self.dstats, self.lam_q, dim=1),
+                torch.zeros(E, device=dev))
+            has_used = used.any(1)
+            slot = (self.dn % 256)
+            rows = ar[has_used]
+            self.dstats[rows, slot[has_used]] = bestv[has_used]
+            self.dn[has_used] += 1
+        else:
+            lam = torch.full((E,), self.lam, device=dev)
+        free = ~used & ~self.dead
+        birth = (bestv > lam) & free.any(1)
+        i = torch.where(birth, free.float().argmax(1), best)
+        n = self.counts[ar, i] + 1
+        lr = (1.0 / n.clamp(max=self.cap)).unsqueeze(-1)
+        self.codes[ar, i] += lr * (v - self.codes[ar, i])
+        self.counts[ar, i] = n
+        # energy merge: touched code vs nearest used neighbor
+        ci = self.codes[ar, i]
+        dj = ((self.codes - ci.unsqueeze(1)) ** 2).sum(-1)
+        mask = self.counts > 0
+        mask[ar, i] = False
+        dj = dj.masked_fill(~mask, big)
+        j = dj.argmin(1)
+        ni_, nj_ = self.counts[ar, i], self.counts[ar, j]
+        cost = ni_ * nj_ / (ni_ + nj_) * dj.gather(
+            1, j.unsqueeze(1)).squeeze(1)
+        do = (cost < lam) & mask.any(1) & (nj_ > 0)
+        i = self._merge(ar, i, j, do)
         if self.content == "soft":
             return self._soft_content(v), i
         return self.codes[ar, i].clone(), i
@@ -507,6 +633,12 @@ def main():
     ap.add_argument("--load-codebook", type=str, default="",
                     help="checkpoint path: skip codebook-model training "
                          "(eval-only reruns, e.g. longer l-eval)")
+    ap.add_argument("--lam", type=float, default=0.0,
+                    help=">0: v7 DP-means energy rule (one constant for "
+                         "birth AND merge; overrides theta/merge-mode)")
+    ap.add_argument("--lam-q", type=float, default=0.0,
+                    help=">0: v7b quantile rent — lam = this quantile of "
+                         "the lifetime's observed nearest distances")
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--n-train-cls", type=int, default=48)
     ap.add_argument("--n-held-cls", type=int, default=12)
@@ -539,7 +671,8 @@ def main():
                         theta=args.theta, theta_merge=args.theta_merge,
                         merge_mode=args.merge_mode,
                         tombstone=args.tombstone, content=args.content,
-                        code_temp=args.code_temp).to(device)
+                        code_temp=args.code_temp, lam=args.lam,
+                        lam_q=args.lam_q).to(device)
     model_b = ToyBinder(args.d_in, k=args.k, use_codes=False).to(device)
     assert not model_a.code_init.requires_grad, \
         "codebook must be gradient-free"
