@@ -282,13 +282,36 @@ Readings:
    percepts; the trained 6-way harness compresses it to oracle -
    nocode = 11.8, of which self-organization captures 2.8.
 
-Decisive follow-ups (cheap, same script): (a) N-way scaling — 12/20-
-way episodes reopen the fine-discrimination regime where class-mean
-consolidation actually pays (the pre-check's regime); (b) longer
-lifetimes past book saturation (used hits 16 ~ep 30) — the toy's
-capacity-anneal predicts joins-forced maturation and a LATE climb;
-(c) coarser grain (lower theta / larger K) to test the view-vs-class
-granularity account directly.
+20-WAY FOLLOW-UP (overnight 2026-07-21, runs 63has9td/5j31u64g +
+verified artifacts, m108899 Ryzen-5090, ~$0.60 incl. 5 failed boots):
+(1) COLD 20-way never trains: 1/20 read-chance starves the bootstrap
+whisper (principle #6, third independent sighting) — book pinned at 1
+code, encoder cone TIGHTENED (0.95/0.84), while the nocode pathway
+trained to 1.000 on the same task. Fix that works: --warm-start-run
+(partial-load the 6-way-grown geometry, reinit label_emb/head/
+code_init) — N-WAY IS A CURRICULUM HORIZON. (2) Warm-started 20-way
+result (chance 5.0): live 46.9 flat (+0.3) > nocode 45.3 > frozen
+9.9; oracle 56.9; used 13 -> 31.7/32 (view-grain fragmentation,
+saturates ~ep 15); NO post-saturation climb (eps 16-23 flat).
+
+Verdict across both N: the codebook's value on real percepts is
+INSTANT (+2-3 over exemplar cards, frozen craters) and the ~10-pt
+oracle gap is CONSTANT — a persistent self-organization (grain)
+deficit, not an episode-count deficit. Both rescue hypotheses for a
+within-lifetime climb (fine discrimination, capacity-anneal) are
+dead on real data. The toy's climb was driven by per-glance noise
+that DINO percepts at this grain simply don't have; the meta-trained
+encoder squeezes ~all identity into one glance and co-adapts AWAY
+the need for accumulation. Open levers, untested: grain (theta/K
+sweep targeting class-grain codes), percept noising (make one glance
+insufficient by construction — occlusion/crop percepts), and tasks
+whose QUERIES need multi-view knowledge (the "reader asks easy
+questions" diagnosis — single-lookup probes may never grade
+accumulation). Ops: vast --thresholds per-launch gate override +
+thresholds_hf_light.json (Drive-bank rate-limited; jpeg floor
+irrelevant for decode-once jobs); m9105 dropped a contract (caution);
+m140318 known-bad; m108899 Ryzen NL = new known-good (3 clean
+provisions, 851 img/s encode, full run in ~11 min).
 
 ## Local environment (Windows)
 
