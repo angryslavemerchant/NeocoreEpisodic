@@ -323,6 +323,53 @@ irrelevant for decode-once jobs); m9105 dropped a contract (caution);
 m140318 known-bad; m108899 Ryzen NL = new known-good (3 clean
 provisions, 851 img/s encode, full run in ~11 min).
 
+## STARTED 2026-07-21: rung 1 — lifetime lexicon acquisition
+## (toy_lexicon_icl.py; the proto-symbol / reader program)
+
+Design (both DINO-campaign lessons built in): grammar permanent,
+LEXICON per-lifetime (32 forms -> random meanings; unsmearable);
+8 episodes x (4 studied pairs + 6 two-primitive composition queries);
+cross-episode queries answerable ONLY through a persistent KEY-VALUE
+book (key = form emb, payload = meaning emb — the pointer-array
+factorization), written by the v6b economy, read as soft mixture
+ADDED to the query token's residual stream inside a 3-layer d=96
+transformer. Arms: live / frozen / oracle / ctx-all (whole lifetime's
+pairs in context — the meta-seq2seq/MLC regime at lifetime scale) /
+ctx-cap / episodic (current episode only).
+
+v0/v1 results (local $0 + m61489 i9-14900K PRO-6000, 9 min, ~$0.20,
+wandb neocore-lex run inqhogit + verified artifact):
+
+    live/oracle: 100.0 cross, 100.0 within, 100.0 exact (book model
+      perfect by step 200; filing flawless — used == studied, zero
+      merges/collisions across all lifetimes)
+    ctx-all:  ~25 within / ~0 cross at 2k steps AND at 8k steps with
+      lr 5e-4 (~1M quiz examples) — never learns lookup, only answer
+      SHAPE (25% = pad-structure knowledge)
+    episodic: same (~25/~3); frozen: floor.
+
+Readings:
+1. The book-as-a-LAYER works completely: retrieval + composition
+   through a residual-stream codebook trains ~instantly and solves
+   lifetime-scale lexicon binding perfectly.
+2. Attention-based in-context lookup FAILS TO IGNITE at this scale
+   even at 4x budget — the dense-arm lesson in its third domain
+   (vision episodic, 20-way bootstrap, now symbolic composition):
+   free-form attention does not discover the lookup circuit that the
+   architectural read path provides for free. >=40x learnability gap
+   (book perfect at 200 steps; baselines nowhere at 8000).
+3. Honest caveats for the eventual comparison: baselines are small
+   (3L/d96) and the literature (meta-seq2seq, MLC) trains bigger
+   models longer — the claim is about LEARNABILITY AT EQUAL SMALL
+   BUDGET, not impossibility. Ignition experiments (deeper/wider
+   baseline, curriculum) are the obvious next arm if the comparison
+   needs teeth.
+
+Next candidates: baseline-ignition study; systematic/productive
+splits (held-out compositions, longer queries); noisy demonstrations
+(re-engage consolidation); growing lexicons past K (capacity
+economics); payload escalation (rung 2).
+
 ## Local environment (Windows)
 
 - No `python` on PATH. Project env is the `ToastEnv` conda env:
