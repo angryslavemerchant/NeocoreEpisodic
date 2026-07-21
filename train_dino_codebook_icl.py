@@ -102,6 +102,14 @@ def main():
     ap.add_argument("--save-prefix", type=str, default="")
     ap.add_argument("--load-codebook", type=str, default="")
     ap.add_argument("--load-nocode", type=str, default="")
+    ap.add_argument("--warm-start-run", type=str, default="",
+                    help="wandb run id whose artifact holds lower-N-way "
+                         "checkpoints; partial-load (all but label_emb/"
+                         "head) into both models. The n-way CURRICULUM: "
+                         "cold 20-way never escapes the cone (run "
+                         "63has9td — 1/20 read chance starves the "
+                         "bootstrap whisper; principle #6), so grow the "
+                         "horizon from a 6-way-grown geometry.")
     ap.add_argument("--wandb", action="store_true",
                     help="stream to wandb + upload a VERIFIED artifact "
                          "(REQUIRED on cloud: the instance self-destroys "
@@ -146,6 +154,27 @@ def main():
                         merge_mode=args.merge_mode, content=args.content,
                         lam=args.lam, **kw).to(device)
     model_b = ToyBinder(world.d_in, use_codes=False, **kw).to(device)
+
+    if args.warm_start_run:
+        import glob
+        import wandb as wb
+        art = wb.Api().artifact(
+            f"luckymushy-individual/{args.wandb_project}/"
+            f"dino-codebook-{args.warm_start_run}:latest")
+        p = art.download()
+
+        def partial_load(model, path):
+            sd = torch.load(path, map_location="cpu")
+            sd = {k: v for k, v in sd.items()
+                  if not k.startswith(("label_emb", "head"))}
+            missing, _ = model.load_state_dict(sd, strict=False)
+            print(f"warm-start {os.path.basename(path)}: {len(sd)} "
+                  f"tensors; reinit "
+                  f"{sorted(set(k.split('.')[0] for k in missing))}",
+                  flush=True)
+
+        partial_load(model_a, glob.glob(os.path.join(p, "*_codebook.pt"))[0])
+        partial_load(model_b, glob.glob(os.path.join(p, "*_nocode.pt"))[0])
 
     if args.load_codebook:
         model_a.load_state_dict(torch.load(args.load_codebook))
