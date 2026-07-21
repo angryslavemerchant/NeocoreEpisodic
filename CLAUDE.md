@@ -365,10 +365,23 @@ Readings:
    baseline, curriculum) are the obvious next arm if the comparison
    needs teeth.
 
-Next candidates: baseline-ignition study; systematic/productive
-splits (held-out compositions, longer queries); noisy demonstrations
-(re-engage consolidation); growing lexicons past K (capacity
-economics); payload escalation (rung 2).
+v2 — SYSTEMATICITY SPLIT (--holdout, the add-jump analog; run
+29mqgtje, m61489, ~10 min, ~$0.20): forms 0-7 never meet TWICE in
+any training lifetime; eval unconstrained. Result: NOVEL-combo
+100.0 at every episode (book and oracle arms; baselines at their
+usual floor). The factorization does not LEARN systematic
+generalization — it makes the failure inexpressible: the book
+delivers meanings frame-blind, the grammar is slot-uniform, and
+neither organ can represent "this combination is new." First result
+of the program aimed at an external benchmark axis (SCAN add-jump)
+and it lands at ceiling by construction.
+
+Next candidates: LENGTH/productivity split (train 2-word, test
+3-word — where even MLC is weakest; needs decoder upgrade);
+baseline-ignition study (fairness); noisy demonstrations
+(consolidation returns); lexicon > K (rent economics); function
+words per-lifetime (payloads that ACT — rung 2); then SCAN-proper
+under the meta-protocol.
 
 ## Local environment (Windows)
 
