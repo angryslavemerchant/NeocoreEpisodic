@@ -38,7 +38,8 @@ import time
 import torch
 import torch.nn.functional as F
 
-from toy_codebook_icl import (N_WAY, ToyBinder, eval_arm,
+import toy_codebook_icl as icl
+from toy_codebook_icl import (ToyBinder, eval_arm,
                               sample_lifetime_classes, train)
 
 
@@ -76,6 +77,10 @@ def main():
     ap.add_argument("--cache", type=str, default="dino_percepts_vits14.pt")
     ap.add_argument("--rep", type=str, default="patch",
                     choices=["patch", "cls"])
+    ap.add_argument("--n-way", type=int, default=6,
+                    help="classes per lifetime/episode (6-way saturates "
+                         "one-shot on DINO percepts — run 6ej88ypk; finer "
+                         "discrimination is where consolidation pays)")
     ap.add_argument("--steps", type=int, default=1500)
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--l-train", type=int, default=12)
@@ -106,13 +111,14 @@ def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(args.seed)
+    icl.N_WAY = args.n_way      # module global read at call time throughout
 
     run = None
     if args.wandb:
         import wandb
         run = wandb.init(project=args.wandb_project,
-                         name=f"dino-{args.rep}-{args.merge_mode}-"
-                              f"{args.content}",
+                         name=f"dino-{args.rep}-{args.n_way}way-"
+                              f"{args.merge_mode}-{args.content}",
                          config=vars(args))
     log_fn = (lambda d: run.log(d)) if run else None
 
@@ -175,8 +181,9 @@ def main():
                               args.eval_batch, args.l_eval,
                               args.eval_batches, device)
 
-    print("\nREAL DATA — held-out IN-100 classes, frozen weights — "
-          "final-step probe top1 (chance 16.7) by episode index:")
+    print(f"\nREAL DATA — held-out IN-100 classes, frozen weights — "
+          f"final-step probe top1 (chance {100 / args.n_way:.1f}) "
+          f"by episode index:")
     names = ["live", "frozen", "oracle", "nocode"]
     print("  ep-idx  " + "  ".join(f"{n:>7s}" for n in names)
           + "   agree    used  merges")
