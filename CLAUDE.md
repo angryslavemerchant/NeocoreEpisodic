@@ -253,12 +253,42 @@ dial of the ontology (rate-distortion Lagrangian; K becomes emergent,
 lam sweeps = "at what grain does the world want to be known") — the
 right formulation, parked until the geometry is frozen.
 
-Next: the real-data version — DINO tokens, lifetimes over held-out
-IN-100 classes, the train_vocab_icl harness with a persistent
-v6b-rule codebook; measure the within-lifetime learning curve at
-scale against the measured +17-pt headroom budget. Fixed-lam energy
-rule as a cheap second arm THERE: frozen DINO percepts have no
-infancy, so v7's failure mode structurally cannot occur.
+REAL-DATA RESULT (train_dino_codebook_icl.py, wandb neocore-codebook
+run 6ej88ypk + verified artifact, m9105 5090, ~40 min, ~$0.35): pooled
+DINOv2-S patch-mean percepts (encoded on-instance, 529 img/s), v6b
+rule, 6-way lifetimes over the 20 held-out classes, L-eval 24:
+
+    live 75.8 FLAT (delta -0.03) > nocode 73.0 flat >> frozen 26.9;
+    oracle 84.8; agree ~74; used RISES 5.3 -> 13.7 all lifetime,
+    merges 1.9 total; raw percepts same/cross cos 0.404/0.097;
+    trained encoder space 0.552/0.014.
+
+Readings:
+1. The codebook is real and load-bearing on real data — live beats
+   nocode by +2.8 everywhere and frozen-random codes crater to 27 —
+   but its entire value arrives by EPISODE 0. No within-lifetime
+   climb: the toy's rising curve did NOT transfer.
+2. Why: the toy's climb was a property of its noise regime. At 6-way
+   with a trained encoder (same-class cos 0.552 in encoder space),
+   ONE glance already lands ~a code's-worth from the class direction;
+   the first write captures nearly all consolidation value; further
+   feeds add nothing at 6-way margins.
+3. The oracle gap (9 pts) is a persistent SELF-ORGANIZATION gap, not
+   a not-enough-episodes gap: used rises all lifetime — real classes
+   are multimodal, the book fragments at VIEW grain (new views keep
+   birthing), small-n view-codes never mature into the class means
+   the oracle has. Granularity, again (rent!).
+4. The pre-check's +25-pt headroom was measured at 20-WAY on raw
+   percepts; the trained 6-way harness compresses it to oracle -
+   nocode = 11.8, of which self-organization captures 2.8.
+
+Decisive follow-ups (cheap, same script): (a) N-way scaling — 12/20-
+way episodes reopen the fine-discrimination regime where class-mean
+consolidation actually pays (the pre-check's regime); (b) longer
+lifetimes past book saturation (used hits 16 ~ep 30) — the toy's
+capacity-anneal predicts joins-forced maturation and a LATE climb;
+(c) coarser grain (lower theta / larger K) to test the view-vs-class
+granularity account directly.
 
 ## Local environment (Windows)
 
