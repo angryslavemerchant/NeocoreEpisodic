@@ -551,7 +551,7 @@ class ToyBinder(nn.Module):
 # Train / eval
 # ---------------------------------------------------------------------------
 
-def train(model, world, pool, steps, E, L, lr, device, tag):
+def train(model, world, pool, steps, E, L, lr, device, tag, log_fn=None):
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
     model.train()
     t0 = time.time()
@@ -572,6 +572,11 @@ def train(model, world, pool, steps, E, L, lr, device, tag):
                   f"lastep-top1 {st['top1']:.3f}  read {st['read_hit']:.3f}"
                   f"  temp {F.softplus(model.raw_temp).item():.1f}  "
                   f"({time.time() - t0:.0f}s)", flush=True)
+            if log_fn is not None:
+                log_fn({f"{tag.strip()}/loss": loss.item(),
+                        f"{tag.strip()}/lastep_top1": st["top1"],
+                        f"{tag.strip()}/read_hit": st["read_hit"],
+                        f"{tag.strip()}/step": step})
 
 
 @torch.no_grad()
