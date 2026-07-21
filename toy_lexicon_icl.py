@@ -217,9 +217,15 @@ def make_lifetime(E, device):
     return lex, sched
 
 
-def make_episode(lex, sched, e, device):
+HOLDOUT_TWICE = 8       # forms 0..7: never modified by TWICE in training
+
+
+def make_episode(lex, sched, e, device, holdout=False):
     """Returns study pairs, query tokens, targets (E,QN,OUT), and a
-    per-output-position origin map: 0=within, 1=cross, 2=pad."""
+    per-output-position origin map: 0=within, 1=cross, 2=pad.
+    holdout=True (training only): forms < HOLDOUT_TWICE never receive
+    TWICE — the add-jump split. At eval, unconstrained queries measure
+    whether the factorization yields systematicity for free."""
     E = lex.shape[0]
     now = sched[:, e]                                       # (E,SPE)
     ridx = torch.randint(0, SPE, (E, 6), device=device)
@@ -243,6 +249,13 @@ def make_episode(lex, sched, e, device):
         o1 = torch.zeros_like(o1)
         o2 = torch.zeros_like(o2)
     mods = torch.randint(0, 2, (E, QN, 2), device=device)   # 0 NOOP 1 TWICE
+    if holdout:
+        mods[:, :, 0] = torch.where(p1 < HOLDOUT_TWICE,
+                                    torch.zeros_like(mods[:, :, 0]),
+                                    mods[:, :, 0])
+        mods[:, :, 1] = torch.where(p2 < HOLDOUT_TWICE,
+                                    torch.zeros_like(mods[:, :, 1]),
+                                    mods[:, :, 1])
     q_tokens = torch.stack(
         [p1, torch.where(mods[:, :, 0] == 1, TOK_TWICE, TOK_NOOP),
          p2, torch.where(mods[:, :, 1] == 1, TOK_TWICE, TOK_NOOP)],
@@ -260,7 +273,10 @@ def make_episode(lex, sched, e, device):
     tgt = torch.where(in2, m2.unsqueeze(-1), tgt)
     o_map = torch.where(in1, o1.view(1, QN, 1).expand(E, QN, OUT), o_map)
     o_map = torch.where(in2, o2.view(1, QN, 1).expand(E, QN, OUT), o_map)
-    return now, q_tokens, tgt, o_map
+    nov1 = ((p1 < HOLDOUT_TWICE) & (mods[:, :, 0] == 1)).unsqueeze(-1)
+    nov2 = ((p2 < HOLDOUT_TWICE) & (mods[:, :, 1] == 1)).unsqueeze(-1)
+    novel = (in1 & nov1) | (in2 & nov2)          # held-out combinations
+    return now, q_tokens, tgt, o_map, novel
 
 
 def ctx_episode(now, lex, Q):
@@ -289,7 +305,7 @@ def ctx_all(sched, lex, e, Q, cap_eps=None):
 # ---------------------------------------------------------------------------
 
 def run_lifetime(model, E, device, K, training, arm="live",
-                 cap_eps=None, lex=None, sched=None):
+                 cap_eps=None, lex=None, sched=None, holdout=False):
     if lex is None:
         lex, sched = make_lifetime(E, device)
     book = None
@@ -306,7 +322,8 @@ def run_lifetime(model, E, device, K, training, arm="live",
     loss = torch.zeros((), device=device)
     stats = []
     for e in range(EPS):
-        now, q_tokens, tgt, o_map = make_episode(lex, sched, e, device)
+        now, q_tokens, tgt, o_map, novel = make_episode(
+            lex, sched, e, device, holdout=holdout)
         if model.use_book and arm == "live":
             with torch.no_grad():
                 for s in range(SPE):
@@ -328,6 +345,8 @@ def run_lifetime(model, E, device, K, training, arm="live",
             for name, oid in (("within", 0), ("cross", 1)):
                 m = o_map == oid
                 st[name] = float(ok[m].mean()) if m.any() else float("nan")
+            st["novel"] = (float(ok[novel].mean()) if novel.any()
+                           else float("nan"))
             st["exact"] = float((pred == tgt).all(-1).float().mean())
             if book is not None:
                 st["used"] = float((book.counts > 0).float().sum(1).mean())
@@ -337,12 +356,13 @@ def run_lifetime(model, E, device, K, training, arm="live",
 
 
 def train(model, steps, E, lr, device, K, tag, arm="live", log_every=200,
-          log_fn=None):
+          log_fn=None, holdout=False):
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
     model.train()
     t0 = time.time()
     for step in range(1, steps + 1):
-        loss, st = run_lifetime(model, E, device, K, True, arm=arm)
+        loss, st = run_lifetime(model, E, device, K, True, arm=arm,
+                                holdout=holdout)
         opt.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -362,8 +382,8 @@ def train(model, steps, E, lr, device, K, tag, arm="live", log_every=200,
 @torch.no_grad()
 def eval_arm(model, E, device, K, arm, batches, cap_eps=None):
     model.eval()
-    acc = {k: torch.zeros(EPS) for k in ("within", "cross", "exact",
-                                         "used", "merges")}
+    acc = {k: torch.zeros(EPS) for k in ("within", "cross", "novel",
+                                         "exact", "used", "merges")}
     cnt = {k: torch.zeros(EPS) for k in acc}
     for _ in range(batches):
         _, stats = run_lifetime(model, E, device, K, False, arm=arm,
@@ -401,6 +421,10 @@ def main():
                     help="stream + VERIFIED artifact (required on cloud: "
                          "the instance self-destroys on exit 0)")
     ap.add_argument("--wandb_project", type=str, default="neocore-lex")
+    ap.add_argument("--holdout", action="store_true",
+                    help="add-jump analog: forms 0..7 never meet TWICE "
+                         "during training; eval is unconstrained and "
+                         "reports the held-out combinations separately")
     args = ap.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -427,11 +451,11 @@ def main():
         bsteps = args.baseline_steps or args.steps
         blr = args.baseline_lr or args.lr
         train(m_book, args.steps, args.batch, args.lr, device, args.k,
-              "book    ", log_fn=log_fn)
+              "book    ", log_fn=log_fn, holdout=args.holdout)
         train(m_all, bsteps, args.batch, blr, device, args.k,
-              "ctx-all ", log_fn=log_fn)
+              "ctx-all ", log_fn=log_fn, holdout=args.holdout)
         train(m_epi, bsteps, args.batch, blr, device, args.k,
-              "episodic", log_fn=log_fn)
+              "episodic", log_fn=log_fn, holdout=args.holdout)
     if args.save_prefix:
         for m, n in ((m_book, "book"), (m_all, "all"), (m_epi, "epi")):
             torch.save(m.state_dict(), f"{args.save_prefix}_{n}.pt")
@@ -469,6 +493,7 @@ def main():
         w = arms[n]["within"] * 100
         print(f"  {n:>8s}: cross {c.mean().item():5.1f}  "
               f"within {w.mean().item():5.1f}  "
+              f"novel-combo {arms[n]['novel'].mean().item() * 100:5.1f}  "
               f"exact {arms[n]['exact'].mean().item() * 100:5.1f}")
 
     if args.out:
