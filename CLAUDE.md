@@ -294,6 +294,16 @@ result (chance 5.0): live 46.9 flat (+0.3) > nocode 45.3 > frozen
 9.9; oracle 56.9; used 13 -> 31.7/32 (view-grain fragmentation,
 saturates ~ep 15); NO post-saturation climb (eps 16-23 flat).
 
+LINE CLOSED 2026-07-21 (Ibanis): the toy proved what it needed to —
+a codebook can learn at test time via handcrafted write/merge rules.
+The recognition-benchmark framing stops here; codebooks continue in
+the composition/proto-symbol direction (see POINTS_OF_INTEREST, the
+reader thread). Unrun decomposition idea worth keeping: a raw-cosine
+arm in any future harness eval separates machinery-generalization
+tax from consolidation gap (at 20-way the trained circuit lost ~30
+pts vs raw prototype cosine — the binding plumbing, not the book,
+was the weakest component).
+
 Verdict across both N: the codebook's value on real percepts is
 INSTANT (+2-3 over exemplar cards, frozen craters) and the ~10-pt
 oracle gap is CONSTANT — a persistent self-organization (grain)
