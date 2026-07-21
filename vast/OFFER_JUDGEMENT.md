@@ -86,6 +86,14 @@ below, then `launch.py launch --offer <ID>`.
 
 ## Machines with a caution flag (usable, watch them)
 
+- machine 9105 — EPYC 7551P RTX 5090, Romania. Two flawless runs
+  (13-h pixel-ICL sweep 2026-07-20, dino-codebook 6-way same night,
+  both verified artifacts), then DROPPED a contract 2026-07-21:
+  instance 45439245 accepted and vanished within ~60 s (no container,
+  no logs, nothing in wandb). One drop after two clean runs = caution,
+  not blacklist. Bonus if revisited: /workspace/data on it caches
+  dino_percepts_vits14.pt (skips the encode step).
+
 - machine 69554 — RTX 5090. EXONERATED 2026-07-19: the "dropped contract"
   was a monitoring false alarm — the run had COMPLETED and self-destroyed
   inside the watcher's 5-min poll gap (wandb shows finished + verified
@@ -100,6 +108,14 @@ below, then `launch.py launch --offer <ID>`.
   and the run completed normally. If it stops twice, blacklist it.
 
 ## Known-bad machines (add as found; also `.vast/blacklist.json`)
+
+- machine 140318 — EPYC 7K62, "(, US)" (unnamed location), RTX 5090.
+  Advertised 4192 Mbps; gate MEASURED 40.3 Mbps to HF / 25.1 to Drive
+  and self-destroyed, 2026-07-21. Fits the 2026-07-19 California-EPYC
+  slow-network pool profile: EPYC 7K62 + blank US location. Treat the
+  whole "(, US)" 7K62 family (m144419, m139253, m139921, m140318...)
+  as suspect until one passes the gate; the gate is cheap, but two
+  gate-fails in a row from the pool = shop elsewhere first.
 
 - machine 43567 — EPYC 9654, Washington US, rel 0.997. Booted into a
   DNS-dead container (status_msg `curl: (6) Could not resolve host:

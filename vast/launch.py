@@ -252,10 +252,13 @@ def cmd_search(args):
 # ---------------------------------------------------------------------------
 
 def build_onstart(branch: str, train_args: str, bench_only: bool,
-                  keep_alive: bool, train_script: str = None) -> str:
+                  keep_alive: bool, train_script: str = None,
+                  thresholds: str = None) -> str:
     exports = [f"export TRAIN_ARGS='{train_args}'"]
     if train_script:
         exports.append(f"export TRAIN_SCRIPT='{train_script}'")
+    if thresholds:
+        exports.append(f"export THRESHOLDS_FILE='{thresholds}'")
     if bench_only:
         exports.append("export BENCH_ONLY=1")
     if keep_alive:
@@ -279,7 +282,8 @@ def build_onstart(branch: str, train_args: str, bench_only: bool,
 
 def create_instance(offer_id: int, secrets: dict, branch: str,
                     train_args: str, bench_only: bool, keep_alive: bool,
-                    purpose: str, train_script: str = None) -> int:
+                    purpose: str, train_script: str = None,
+                    thresholds: str = None) -> int:
     # Neocore runs log to their own wandb project (new era, new project);
     # everything else stays in asfnetAE. upload_results.py reads the same
     # env var, so training and the post-eval upload always agree.
@@ -296,7 +300,7 @@ def create_instance(offer_id: int, secrets: dict, branch: str,
             secrets["RCLONE_DRIVE_TOKEN"].encode()).decode()
         env += f" -e RCLONE_DRIVE_TOKEN_B64={b64}"
     onstart = build_onstart(branch, train_args, bench_only, keep_alive,
-                            train_script)
+                            train_script, thresholds)
     result = vast("create", "instance", offer_id,
                   "--image", IMAGE,
                   "--disk", DISK_GB,
@@ -351,7 +355,8 @@ def hedged_launch(args, secrets, gpu, max_dph):
                                   args.train_args, bench_only=False,
                                   keep_alive=args.keep_alive,
                                   purpose="train",
-                                  train_script=args.train_script)
+                                  train_script=args.train_script,
+                                  thresholds=args.thresholds)
             racers[iid] = o
             all_created.add(iid)
             print(f"  racer {iid} on m{o.get('machine_id')} "
@@ -427,7 +432,8 @@ def cmd_launch(args):
     iid = create_instance(offer_id, secrets, args.branch, args.train_args,
                           bench_only=False, keep_alive=args.keep_alive,
                           purpose="smoke" if args.smoke else "train",
-                          train_script=args.train_script)
+                          train_script=args.train_script,
+                          thresholds=args.thresholds)
     print(f"\nInstance {iid} created.")
     print(f"  watch:   python vast/launch.py logs --id {iid}")
     print(f"  destroy: python vast/launch.py destroy --id {iid}")
@@ -658,6 +664,10 @@ def main():
                     help="Full replacement for the profile's default "
                          "train args (BASE_TRAIN_ARGS + the profile's "
                          "batch/lr/data/compile recipe)")
+    sp.add_argument("--thresholds", type=str, default=None,
+                    help="alternate gate thresholds JSON (repo path), e.g. "
+                         "vast/thresholds_hf_light.json for HF-only "
+                         "percept jobs with no Drive-bank dependency")
     sp.add_argument("--train-script", type=str, dest="train_script",
                     default="train_neocore.py",
                     help="Training entry point; default is the Neocore "

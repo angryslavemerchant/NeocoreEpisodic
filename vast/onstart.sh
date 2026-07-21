@@ -75,7 +75,7 @@ echo "INSTALLING_DEPS"
 # KEEP_ALIVE (smoke tests) preserves the instance so the failing metrics
 # can be inspected — otherwise the destroy takes the evidence with it.
 # timeout = outer belt; benchmark.py also enforces per-test hard limits.
-if ! timeout -k 60 1200 "$PY" vast/benchmark.py --gate vast/thresholds.json --out /workspace/benchmark.json; then
+if ! timeout -k 60 1200 "$PY" vast/benchmark.py --gate "${THRESHOLDS_FILE:-vast/thresholds.json}" --out /workspace/benchmark.json; then
     if [ -n "${KEEP_ALIVE:-}" ]; then
         echo "GATE_FAILED — KEEP_ALIVE set, instance left up for inspection"
         exit 1
