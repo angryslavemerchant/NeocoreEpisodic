@@ -376,12 +376,34 @@ neither organ can represent "this combination is new." First result
 of the program aimed at an external benchmark axis (SCAN add-jump)
 and it lands at ceiling by construction.
 
-Next candidates: LENGTH/productivity split (train 2-word, test
-3-word — where even MLC is weakest; needs decoder upgrade);
-baseline-ignition study (fairness); noisy demonstrations
-(consolidation returns); lexicon > K (rent economics); function
-words per-lifetime (payloads that ACT — rung 2); then SCAN-proper
-under the meta-protocol.
+v3 — LENGTH split (train 2-word queries only, eval 3-word; fixed
+sinusoidal positions so the grade lands on the circuit, not on
+untrained slot embeddings; run ku961rhj, ~8 min, ~$0.15):
+PRODUCTIVITY IS NOT FREE. live/oracle LEN3 ~57 per-position vs ~27
+pad-floor, 0.0 exact everywhere. Decomposition is clean: oracle ==
+live, so retrieval is length-blind (the book delivered the third
+word's meaning) — the failure is the COMPOSER, a fixed-depth
+two-group template that cannot unroll a third group. Tonight's
+contrast, factored on the architecture's seam: systematicity is a
+LEXICON property (solved by construction, 100.0); productivity is a
+COMPOSER property (fails, like everyone's). Repair direction = the
+program's own thesis: composition = re-reading — an ITERATIVE
+composer (autoregressive emission = the minimal re-entrant loop)
+should length-generalize by construction. That is the next surgery.
+
+Also standing (Ibanis): an EXEMPLAR-STORE arm (append-only encoded
+key/value pairs, same soft read, no economy) joins the arm set from
+the noise version onward — in the deterministic world it is
+degenerate-identical to the book (writes are append-only there:
+used == studied, zero merges), so the current wins are attributable
+to the vector-store INTERFACE alone; noise/capacity/drift are where
+interface and economy separate (the proto-vs-exemplar decomposition,
+symbolic edition).
+
+Next candidates: iterative composer (productivity repair — the
+loop's first mandated appearance); noisy demonstrations + exemplar
+arm; lexicon > K; function words per-lifetime (rung 2); then
+SCAN-proper under the meta-protocol.
 
 ## Local environment (Windows)
 
