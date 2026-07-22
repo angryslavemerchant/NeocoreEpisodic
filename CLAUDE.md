@@ -494,19 +494,91 @@ tautological GIVEN the schema fits — the finding is that the same
 operations, and that the length split (the field's wall) is
 length-blind by construction.
 
-NEXT SESSION ENTRY POINT — AMORTIZED INFERENCE (the last empty seat
-in the division-of-labor table): hypothesis spaces too large to
-enumerate; a small learned net PROPOSES a word's program/binding,
-the frozen kernel VERIFIES by execution against the demo (exact,
-cheap), and only verified conclusions get FILED. Propose-verify-file
-= safe amortization: learned guessing, guaranteed-correct memory.
-Build: extend the SCAN world with wide program schemas (e.g. k-field
-words, 2^k >> enumerable), inference net vs enumeration-while-it-
-lasts vs random-proposal baselines; measure demos-to-acquisition vs
-space size. v8 sharpened the motivation: amortized/joint inference
-also removes the curriculum-ladder dependence (random-demo 0.0).
-Then: PCFG (Hupkes) under the frozen-kernel rule, host-model
-integration (organs as layers in a real transformer).
+## STARTED 2026-07-21/22 (overnight): THE STREAM WORLD — the program's
+## goal named, and v0 built (toy_stream_icl.py)
+
+The goal, converged with Ibanis after the SCAN wins deflated ("what
+did we do past a soft-updating codebook?"): **the missing middle
+timescale**. The standard recipe (token mixing + dense + AR) has two
+knowledge stores — weights (learn over training, then freeze; new
+knowledge smears in destructively) and context (holds anything,
+retains nothing, quadratic rent) — and NOTHING between. Field check
+(2026-07-21, sources in POI): DeepSeek MoE routers ARE codebooks
+(expert centroids + a handcrafted rent-like load-balancing bias);
+PEER = million tiny experts behind product keys; Meta's Memory
+Layers at Scale = codebook layers replacing FFN at 128B params
+beating dense at 2x compute; DKVB = sparse codebook continual
+learning. ALL are carved by backprop then FROZEN at deployment.
+Nobody ships write rules. The economy is the piece we hold. Target
+demo: frozen-weight LM + writable codebook layer acquires
+compositional knowledge from a stream, permanently, beyond any
+context window; dense/frozen-book twins can't. "Learning that
+doesn't end when training does." The kernel/SCAN line stands as
+instruments; the machinery agenda continues INSIDE a model (Ibanis:
+"a machine not a brain" — corrected course).
+
+v0 (toy_stream_icl.py, built+run overnight; local gate + 2 cloud
+runs, wandb neocore-stream vh0tirc1 clean / kbinqoq4 noise, both
+verified artifacts, ~$1.1 incl. 2 failed boots): 6L d256 causal LM,
+DOCUMENT-LOCAL attention (context = the sentence, by construction),
+one v6b book read at two depths (two hops = composition;
+read-output zero-init), writes on fact sentences (key = typed
+subject embedding theta=0.75, payload = mean token embedding), aux
+retrieval CE annealed to ZERO mid-training, per-lifetime entities/
+relations/attributes (16 entities, unsmearable). Questions: lookup
+(rel/attr) + 2-hop composition (attr of A's partner — facts filed
+documents apart). Arms: live / exemplar-FIFO (append-only ring) /
+frozen / oracle / dense twin.
+
+    quiz acc (rel/attr/comp)   clean 16-ent      noise p=0.3, 4 stmts
+    live (v6b economy)         100/100/100       94.3/93.7/89.1
+    exemplar-FIFO              100/100/100       46.5/54.1/28.3
+    oracle                     100/100/100       100/100/100
+    frozen                     ~chance           ~chance
+    dense twin                 5.2/16.7/16.9     5.2/15.7/16.0  (chance)
+
+    capacity sweep (live vs exemplar, quiz comp):  K=64  48  32  24  16
+    clean  live   100 100 100  75  55     exemplar  100  50  29  25  19
+    noise  live    90  89  89  66  51     exemplar   28  23  19  18  17
+
+Readings:
+1. **The middle timescale exists in v0**: a frozen-weight LM answers
+   2-hop compositional questions about facts no context window ever
+   held — through the rule-written book alone. Dense twin: chance
+   forever (no channel, by construction). Aux wheels annealed to 0
+   with no wobble in BOTH worlds: the circuit stands without
+   supervision at deployment AND at the end of meta-training.
+2. **The economy is load-bearing exactly where the campaign
+   predicted**: clean + ample capacity, live == exemplar (interface
+   suffices — lexicon lesson replicated in LM form). Add noise OR
+   scarcity and consolidation wins huge: exemplar-FIFO craters to
+   28-47 under noise while live holds ~90; live's filing stays
+   PERFECT (used=32=facts, zero merges) — running means are the
+   noise-vote consolidation in vector form.
+3. **Graceful degradation under forced joins**: live at K=16 (half
+   the fact count) still ~2x exemplar everywhere — the v7 lexicon
+   superposition result, third domain.
+4. Live holds ceiling until K < #facts exactly (100 at K=32=facts,
+   drop at 24): the economy's dedup makes capacity requirements
+   track FACTS, not statements; exemplar's track statements (dies at
+   K=48 < 64 statements even clean).
+5. Ops: m122781 gate-killed at bench (fine); m58908 "success,
+   running" but ZERO log output 30 min = silent zombie, destroyed
+   manually — new failure mode for the ledger; m55313 + m144477
+   (Estonia) clean fast runs (~0.35 s/step at d256/6L).
+
+v1 relaxations queued (the wheels, in removal order): learned writer
+head on hidden states (not raw embeddings); write timing decided by
+novelty gate (no harness fact-flags); interleaved fact/question
+streams (true within-lifetime curve); paraphrase templates; then the
+REAL milestone — a small real-text LM (TinyStories-class) with one
+FFN swapped for the writable book, meta-trained on entity-renamed
+streams: the Meta-Memory-Layers comparison with deployment writes.
+
+STANDING ALTERNATE ENTRY — AMORTIZED INFERENCE (propose-verify-file,
+spec above at v8): still the symbolic line's next build; motivation
+sharpened by v8 (removes the curriculum-ladder dependence). The two
+lines converge at host-model integration.
 
 ## Local environment (Windows)
 

@@ -154,3 +154,23 @@ disappears from `show instances` entirely, the host dropped the contract —
 same response. Note: current `thresholds.json` GPU floor (90 bf16 TFLOPS) is
 a broken-hardware floor, not a Blackwell performance bar — rerun
 `launch.py scan` on the Blackwell fleet to calibrate real thresholds.
+- machine 58908 — EPYC 7742, "(, US)", RTX 5090. NEW FAILURE MODE
+  (2026-07-22): container status_msg "success, running" but ZERO
+  onstart/log output for 30+ minutes — a silent zombie billing
+  $0.44/hr with nothing verifiably executing. `launch.py logs`
+  completely empty (not truncated, not unicode-crashed). Destroyed
+  manually. Lesson: "running" status is NOT evidence of progress —
+  if logs are empty past ~8 min (boot+deps normally show output by
+  then), treat as dead and destroy. Watchers should alarm on
+  log-silence, not just on GONE/error markers.
+- machine 122781 — EPYC 9454, "(, US)", RTX 5090. Gate self-destroyed
+  at the bench stage 2026-07-22 (logs died with the container; cause
+  unrecorded, likely network floor). One strike, not blacklisted.
+
+## Known-good machines (recent clean runs)
+
+- m108899 (Ryzen 9950X, NL) — 3 clean provisions 2026-07-21.
+- m61489 (i9-14900K, MA, PRO 6000) — fast for python-bound toys.
+- m55313 (EPYC 7R32, CA, 5090) — clean stream-world run 2026-07-22.
+- m144477 (EPYC 7C13, Estonia, 5090) — clean stream-world run
+  2026-07-22, ~0.35 s/step on the d256/6L toy; rel 0.945 was fine.
