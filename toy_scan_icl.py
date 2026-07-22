@@ -224,24 +224,243 @@ def run_lifetime_kernel(E, device, eval_only_last=True):
     return res
 
 
+# ---------------------------------------------------------------------------
+# AR contrast arm: full study stream in context, teacher-forced
+# ---------------------------------------------------------------------------
+
+def gen_study_and_tokens(E, device):
+    """One lifetime's full study protocol, both as kernel teachings and
+    as a flat token stream for the AR model. Returns maps + tokens."""
+    maps, perm = make_lifetime(E, device)
+    ker = Kernel(E, device)
+    ar = torch.arange(E, device=device)
+    toks = []
+    taught_v, taught_d = [], []
+    vp, dp, sp, cp = 0, 0, 0, 0
+    for e in range(EPS):
+        for cls in SCHED[e]:
+            if cls == "V" or cls == "D":
+                if cls == "V":
+                    local = perm["v"][:, vp]; vp += 1
+                    form = local
+                    act = maps["v"][ar, local]
+                    taught_v.append(local)
+                else:
+                    local = perm["d"][:, dp]; dp += 1
+                    form = local + N_V
+                    act = maps["d"][ar, local]
+                    taught_d.append(local)
+                ker.teach_atom(form, act)
+                toks += [form, act + T_ACT0,
+                         torch.full_like(form, T_SEP)]
+            elif cls == "S":
+                local = perm["s"][:, sp]; sp += 1
+                vi = taught_v[torch.randint(len(taught_v), (1,)).item()]
+                di = taught_d[torch.randint(len(taught_d), (1,)).item()]
+                demo = sample_cmd(E, device, maps, vi, di, local,
+                                  torch.zeros_like(local),
+                                  torch.ones_like(local).bool(),
+                                  torch.ones_like(local).bool(),
+                                  torch.zeros_like(local).bool())
+                ker.teach_demo_s(local, demo, vi, di)
+                out8 = demo[:, :8]
+                toks += [vi, local + S0, di + N_V]
+                toks += [torch.where(out8[:, t] < NA, out8[:, t] + T_ACT0,
+                                     torch.full_like(vi, T_PAD))
+                         for t in range(8)]
+                toks += [torch.full_like(vi, T_SEP)]
+            else:
+                local = perm["c"][:, cp]; cp += 1
+                vi = taught_v[torch.randint(len(taught_v), (1,)).item()]
+                demo = sample_cmd(E, device, maps, vi,
+                                  torch.zeros_like(local), local, local,
+                                  torch.zeros_like(local).bool(),
+                                  torch.zeros_like(local).bool(),
+                                  torch.ones_like(local).bool())
+                ker.teach_demo_c(local, demo, vi)
+                out3 = demo[:, :3]
+                toks += [vi, local + C0]
+                toks += [torch.where(out3[:, t] < NA, out3[:, t] + T_ACT0,
+                                     torch.full_like(vi, T_PAD))
+                         for t in range(3)]
+                toks += [torch.full_like(vi, T_SEP)]
+    study = torch.stack(toks, dim=1)                        # (E, ~120)
+    return maps, ker, study
+
+
+def gen_eval_queries(E, device, maps):
+    frames = {"V": (0, 0, 0), "VD": (1, 0, 0), "VC": (0, 0, 1),
+              "VDC": (1, 0, 1), "VSD": (1, 1, 0), "VSDC": (1, 1, 1)}
+    out = {}
+    for name, (hd, hs, hc) in frames.items():
+        vi = torch.randint(0, N_V, (E,), device=device)
+        di = torch.randint(0, N_D, (E,), device=device)
+        si = torch.randint(0, N_S, (E,), device=device)
+        ci = torch.randint(0, N_C, (E,), device=device)
+        hdt = torch.full((E,), bool(hd), dtype=torch.bool, device=device)
+        hst = torch.full((E,), bool(hs), dtype=torch.bool, device=device)
+        hct = torch.full((E,), bool(hc), dtype=torch.bool, device=device)
+        tgt = sample_cmd(E, device, maps, vi, di, si, ci, hdt, hst, hct)
+        pad = torch.full_like(vi, T_PAD)
+        q = torch.stack([vi,
+                         torch.where(hst, si + S0, pad),
+                         torch.where(hdt, di + N_V, pad),
+                         torch.where(hct, ci + C0, pad)], dim=1)
+        out[name] = (vi, di, si, ci, hdt, hst, hct, q, tgt)
+    return out
+
+
+class ARScan(nn.Module):
+    def __init__(self, base_len, d=96, layers=3, heads=4):
+        super().__init__()
+        import math
+        self.d = d
+        self.base = base_len + 4                # study + query
+        seq = self.base + 1 + OUTM              # BOS + answers
+        pos = torch.zeros(seq, d)
+        t = torch.arange(seq).unsqueeze(1).float()
+        div = torch.exp(torch.arange(0, d, 2).float()
+                        * (-math.log(10000.0) / d))
+        pos[:, 0::2] = torch.sin(t * div)
+        pos[:, 1::2] = torch.cos(t * div)
+        self.register_buffer("pos", pos * 0.3)
+        allowed = torch.zeros(seq, seq, dtype=torch.bool)
+        allowed[:, :self.base] = True
+        for i in range(self.base, seq):
+            allowed[i, self.base:i + 1] = True
+        self.register_buffer("mask", ~allowed)
+        self.emb = nn.Embedding(VOCAB, d)
+        self.blocks = nn.ModuleList(
+            nn.ModuleDict({}) for _ in range(0))  # placeholder unused
+        from toy_composer_icl import MBlock
+        self.blks = nn.ModuleList(MBlock(d, heads) for _ in range(layers))
+        self.norm = nn.LayerNorm(d)
+        self.head = nn.Linear(d, PAD_CLS + 1)
+
+    def _run(self, study, q, ans_in):
+        x = self.emb(torch.cat([study, q, ans_in], dim=1))
+        x = x + self.pos[: x.shape[1]]
+        m = self.mask[: x.shape[1], : x.shape[1]]
+        for b in self.blks:
+            x = b(x, mask=m)
+        return self.head(self.norm(x[:, self.base:]))
+
+    def loss(self, study, q, tgt):
+        bos = torch.full((tgt.shape[0], 1), T_BOS, dtype=torch.long,
+                         device=tgt.device)
+        prev = torch.where(tgt[:, :-1] < NA, tgt[:, :-1] + T_ACT0,
+                           torch.full_like(tgt[:, :-1], T_PAD))
+        logits = self._run(study, q, torch.cat([bos, prev], dim=1))
+        return F.cross_entropy(logits.reshape(-1, PAD_CLS + 1),
+                               tgt.reshape(-1))
+
+    @torch.no_grad()
+    def generate(self, study, q):
+        E = study.shape[0]
+        dev = study.device
+        ans = torch.full((E, OUTM), T_PAD, dtype=torch.long, device=dev)
+        out = torch.full((E, OUTM), PAD_CLS, dtype=torch.long, device=dev)
+        cur = torch.full((E, 1), T_BOS, dtype=torch.long, device=dev)
+        for t in range(OUTM):
+            ans_in = torch.cat([cur, torch.where(
+                out[:, :OUTM - 1] < NA, out[:, :OUTM - 1] + T_ACT0,
+                torch.full_like(out[:, :OUTM - 1], T_PAD))], dim=1)
+            lg = self._run(study, q, ans_in)
+            out[:, t] = lg[:, t].argmax(-1)
+        return out
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--arm", type=str, default="kernel",
+                    choices=["kernel", "ar", "both"])
+    ap.add_argument("--steps", type=int, default=2000)
+    ap.add_argument("--batch", type=int, default=32)
+    ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--eval-batch", type=int, default=512)
     ap.add_argument("--eval-batches", type=int, default=8)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--save-prefix", type=str, default="")
+    ap.add_argument("--wandb", action="store_true")
+    ap.add_argument("--wandb_project", type=str, default="neocore-lex")
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(args.seed)
-    agg = {}
-    t0 = time.time()
-    for _ in range(args.eval_batches):
-        r = run_lifetime_kernel(args.eval_batch, device)
-        for k, v in r.items():
-            agg[k] = agg.get(k, 0.0) + v / args.eval_batches
-    print(f"SCAN-lite, frozen kernel, ZERO trained parameters "
-          f"({time.time() - t0:.0f}s):")
-    print("  exact-match by frame: "
-          + "  ".join(f"{k}={v * 100:.1f}" for k, v in agg.items()))
+    run = None
+    if args.wandb:
+        import wandb
+        run = wandb.init(project=args.wandb_project,
+                         name=f"scanlite-{args.arm}-s{args.steps}",
+                         config=vars(args))
+    results = {}
+
+    if args.arm in ("kernel", "both"):
+        agg = {}
+        t0 = time.time()
+        for _ in range(args.eval_batches):
+            r = run_lifetime_kernel(args.eval_batch, device)
+            for k, v in r.items():
+                agg[k] = agg.get(k, 0.0) + v / args.eval_batches
+        print(f"kernel ({time.time() - t0:.0f}s): "
+              + "  ".join(f"{k}={v * 100:.1f}" for k, v in agg.items()),
+              flush=True)
+        results["kernel"] = agg
+
+    if args.arm in ("ar", "both"):
+        base = gen_study_and_tokens(2, device)[2].shape[1]
+        model = ARScan(base).to(device)
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
+                                weight_decay=0.01)
+        t0 = time.time()
+        for step in range(1, args.steps + 1):
+            maps, _, study = gen_study_and_tokens(args.batch, device)
+            qs = gen_eval_queries(args.batch, device, maps)
+            loss = 0.0
+            for name, (_, _, _, _, _, _, _, q, tgt) in qs.items():
+                loss = loss + model.loss(study, q, tgt)
+            loss = loss / len(qs)
+            opt.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+            if step == 1 or step % 200 == 0:
+                print(f"[ar] step {step:5d}  loss {loss.item():.4f}  "
+                      f"({time.time() - t0:.0f}s)", flush=True)
+                if run:
+                    run.log({"ar/loss": loss.item(), "ar/step": step})
+        agg = {}
+        with torch.no_grad():
+            for _ in range(args.eval_batches):
+                maps, _, study = gen_study_and_tokens(args.eval_batch // 2,
+                                                      device)
+                qs = gen_eval_queries(args.eval_batch // 2, device, maps)
+                for name, (_, _, _, _, _, _, _, q, tgt) in qs.items():
+                    out = model.generate(study, q)
+                    agg[name] = agg.get(name, 0.0) + float(
+                        (out == tgt).all(1).float().mean()) \
+                        / args.eval_batches
+        print("ar:      "
+              + "  ".join(f"{k}={v * 100:.1f}" for k, v in agg.items()),
+              flush=True)
+        results["ar"] = agg
+        if args.save_prefix:
+            torch.save(model.state_dict(), args.save_prefix + "_ar.pt")
+
+    if run:
+        import wandb
+        for arm, r in results.items():
+            for k, v in r.items():
+                run.summary[f"{arm}_{k}"] = v
+        with open("results.json", "w") as f:
+            json.dump(results, f, indent=1)
+        art = wandb.Artifact(f"scanlite-{run.id}", type="results")
+        art.add_file("results.json")
+        if args.save_prefix and os.path.exists(args.save_prefix + "_ar.pt"):
+            art.add_file(args.save_prefix + "_ar.pt")
+        run.log_artifact(art)
+        art.wait()
+        print("ARTIFACT_VERIFIED", flush=True)
+        run.finish()
 
 
 if __name__ == "__main__":
