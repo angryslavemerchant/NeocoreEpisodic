@@ -440,11 +440,36 @@ evidence to the brittleness objection), (b) one-demo word learning
 incl. structural words, (c) the separation-of-concerns gap measured:
 computing acquisition vs optimizing toward it.
 
-Next candidates: noisy demos + exemplar-store arm (posteriors go
-soft; consolidation returns); lexicon > K (rent); connectors/
-multi-clause (order ops — the frozen-kernel discipline's next test);
-larger hypothesis spaces (where amortized/learned inference must
-replace enumeration — backprop's principled re-entry); SCAN-proper.
+v6 — NOISE + CONNECTORS (toy_scan_noise_icl.py, local, 2 s, $0):
+connectors PASS the frozen-kernel discipline (swap-bit program over
+order-blind concat; no new op; 90 -> 100 as tie-demos wash out);
+noise restores the within-lifetime LEARNING CURVE via vote
+consolidation (p=0.3: 42 -> 95 over 6 rounds) — exactly where the
+DINO diagnosis located it (where one observation stops sufficing).
+Caught + fixed a silent gather-broadcast bug via the pre-registered
+clean-world 100s.
+
+v7 — CAPACITY ECONOMICS (eval-only sweep on the v3 lexicon
+checkpoint, local, $0): K in {24,16,12,8} drawers for 32 words:
+live economy 95.7/81.3/68.8/51.1 vs oracle-truncation 75.9/50.1/
+38.2/25.9 (exactly K/32). The economy beats truncation ~2:1 at every
+pressure: forced joins blend payloads and the soft read + tower
+recover information BEYOND one-word-per-slot — superposition as the
+emergent overflow strategy. Zero-shot (model never saw overflow in
+meta-training) -> learned-superposition headroom if trained scarce.
+
+NEXT SESSION ENTRY POINT — AMORTIZED INFERENCE (the last empty seat
+in the division-of-labor table): hypothesis spaces too large to
+enumerate; a small learned net PROPOSES a word's program/binding,
+the frozen kernel VERIFIES by execution against the demo (exact,
+cheap), and only verified conclusions get FILED. Propose-verify-file
+= safe amortization: learned guessing, guaranteed-correct memory.
+Build: extend the SCAN world with wide program schemas (e.g. k-field
+words, 2^k >> enumerable), inference net vs enumeration-while-it-
+lasts vs random-proposal baselines; measure demos-to-acquisition vs
+space size. Then: SCAN-proper/PCFG under the frozen-kernel rule
+(brittleness bout #3), host-model integration (organs as layers in
+a real transformer).
 
 ## Local environment (Windows)
 
