@@ -577,6 +577,33 @@ REAL milestone — a small real-text LM (TinyStories-class) with one
 FFN swapped for the writable book, meta-trained on entity-renamed
 streams: the Meta-Memory-Layers comparison with deployment writes.
 
+AUX ABLATION (2026-07-22, local, $0, Ibanis asked "could it exist
+without the aux?"): trained the toy from scratch with aux_w=0 from
+step 1. SELF-IGNITES: hop-1 lookup 100 by step 100 unsupervised;
+composition plateaus ~30-45 for 300 steps then PHASE-JUMPS to ~100
+at step 400 (induction-head-shaped transition). The aux buys speed,
+not existence — at this scale, with recipe writes. Caveat: the
+learned-writer version reintroduces a write-read chicken-and-egg;
+aux stays as ignition insurance there, with writer-init-at-recipe as
+the aux-free alternative to try first.
+
+REAL-TEXT CAMPAIGN STAGE 1 (2026-07-22, stream_text_icl.py): GPT-2
+BPE pipeline built per the 4-layer dataset architecture agreed with
+Ibanis (fact graph -> slot templates -> assembly -> probes; nonce
+names are MULTI-TOKEN spans — the honest hard mode; held-out
+paraphrase templates as an eval split; two-hop chains person ->
+company -> industry/city and person -> spouse -> profession).
+Answers graded teacher-forced exact-match over multi-token spans.
+v1 wheels: harness-slot filing (fact-id), doc-mean-embedding
+content; live-theta arm instruments how far bag-of-embedding
+novelty-gate filing gets at BPE level (expected to degrade —
+informative, not gating). Plan (Ibanis-approved sequencing): this
+smoke -> co-design LLM template bank -> graft into pretrained
+124M (LoRA ladder: r16 -> r64 -> unfreeze-middle -> full FT) ->
+five-arm experiment (writable / frozen-at-eval / Meta-regime
+backprop-slots / dense / long-context / LoRA-per-stream). Est.
+~$10/full pass, 2-3 nights total.
+
 STANDING ALTERNATE ENTRY — AMORTIZED INFERENCE (propose-verify-file,
 spec above at v8): still the symbolic line's next build; motivation
 sharpened by v8 (removes the curriculum-ladder dependence). The two
