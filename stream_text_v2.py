@@ -378,10 +378,11 @@ class Lifetime:
 
 
 def build_batch(B, device, rng, bank_part="train", stmts=2,
-                filler_frac=0.3, abstain_frac=0.12):
+                filler_frac=0.3, abstain_frac=0.12, n_stream_q=None):
     lts = [Lifetime(rng, bank_part=bank_part, stmts=stmts,
                     filler_frac=filler_frac,
-                    abstain_frac=abstain_frac) for _ in range(B)]
+                    abstain_frac=abstain_frac,
+                    n_stream_q=n_stream_q) for _ in range(B)]
     D = max(len(lt.docs) for lt in lts)
     toks = torch.full((B, D, L_DOC), PAD, dtype=torch.long)
     fids = torch.full((B, D), -1, dtype=torch.long)
@@ -577,11 +578,15 @@ def run_batch(model, batch, K, device, arm, aux_w):
 
 def train(model, steps, B, K, lr, device, tag, arm, aux_anneal, stmts,
           filler_frac, log_every=100, log_fn=None, abstain_frac=0.12,
-          abstain_warmup=0.5):
-    """abstain_warmup: no abstention questions until this fraction of
-    training — the 'unknown' answer is a degenerate basin when it is
-    available before the retrieval circuit exists (v2.0 gate failure:
-    all arms parked at abstain~1.0, h1~floor)."""
+          abstain_warmup=0.5, stream_q_warmup=0.0):
+    """Curricula (both evidence-backed by the bisect campaign):
+    - abstain_warmup: no abstention questions until this fraction of
+      training — 'unknown' is a degenerate basin before the circuit
+      exists (v2.0 failure).
+    - stream_q_warmup: no MID-STREAM questions until this fraction —
+      partial-book retrieval is the hardest regime and suppresses
+      ignition 5x when present from step one (bisect D2 verdict:
+      16/21 vs 85/97 on the single variable)."""
     opt = torch.optim.AdamW(model.parameters(), lr=lr,
                             weight_decay=0.01)
     model.train()
@@ -591,8 +596,10 @@ def train(model, steps, B, K, lr, device, tag, arm, aux_anneal, stmts,
         aux_w = max(0.0, 1.0 - step / max(steps * aux_anneal, 1)) \
             if (model.use_book and aux_anneal > 0) else 0.0
         af = abstain_frac if step > steps * abstain_warmup else 0.0
+        sq = None if step > steps * stream_q_warmup else 0
         batch = build_batch(B, device, rng, stmts=stmts,
-                            filler_frac=filler_frac, abstain_frac=af)
+                            filler_frac=filler_frac, abstain_frac=af,
+                            n_stream_q=sq)
         loss, st = run_batch(model, batch, K, device, arm, aux_w)
         opt.zero_grad()
         loss.backward()
@@ -650,6 +657,7 @@ def main():
     ap.add_argument("--n-p", type=int, default=10)
     ap.add_argument("--bank-cap", type=int, default=0)
     ap.add_argument("--n-stream-q", type=int, default=16)
+    ap.add_argument("--stream-q-warmup", type=float, default=0.0)
     ap.add_argument("--eval-batch", type=int, default=48)
     ap.add_argument("--eval-batches", type=int, default=3)
     ap.add_argument("--seed", type=int, default=0)
@@ -693,12 +701,14 @@ def main():
               "book ", "live", args.aux_anneal, args.stmts,
               args.filler_frac, log_fn=log_fn,
               abstain_frac=args.abstain_frac,
-              abstain_warmup=args.abstain_warmup)
+              abstain_warmup=args.abstain_warmup,
+              stream_q_warmup=args.stream_q_warmup)
         train(m_dense, args.steps, args.batch, args.k, args.lr,
               device, "dense", "live", 0, args.stmts,
               args.filler_frac, log_fn=log_fn,
               abstain_frac=args.abstain_frac,
-              abstain_warmup=args.abstain_warmup)
+              abstain_warmup=args.abstain_warmup,
+              stream_q_warmup=args.stream_q_warmup)
     if args.save_prefix:
         torch.save(m_book.state_dict(),
                    f"{args.save_prefix}_book.pt")
