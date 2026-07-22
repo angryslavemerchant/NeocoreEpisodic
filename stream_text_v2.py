@@ -65,7 +65,8 @@ CO_SUFFIX = ["Industries", "Group", "Logistics", "Works", "Holdings",
              "Systems"]
 PROD_SUFFIX = ["Series", "Line", "Kit", "Blend", "Frame", "Core"]
 
-N_C, N_P = 5, 10
+N_C, N_P = 5, 10          # bisect knobs (main() may override)
+STREAM_Q = 16
 RELS = ["founded", "industry", "based_in", "makes",
         "works_as", "lives_in", "works_at", "partner"]
 Q1 = ["q_founded", "q_industry", "q_based_in", "q_makes",
@@ -78,7 +79,9 @@ _REMAP = None
 _NVOCAB = None
 
 
-def load_bank(path="templates_bank.json"):
+def load_bank(path="templates_bank.json", cap=0):
+    """cap>0: use only the first `cap` templates per category (bisect
+    knob — v1-parity template diversity)."""
     global _BANK
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
@@ -88,10 +91,12 @@ def load_bank(path="templates_bank.json"):
             _BANK["train"][k] = items
             _BANK["hold"][k] = items
         elif k.startswith("q_"):
-            _BANK["train"][k] = items[:-4]
+            tr = items[:-4]
+            _BANK["train"][k] = tr[:cap] if cap else tr
             _BANK["hold"][k] = items[-4:]
         else:
-            _BANK["train"][k] = items[:-10]
+            tr = items[:-10]
+            _BANK["train"][k] = tr[:cap] if cap else tr
             _BANK["hold"][k] = items[-10:]
     return _BANK
 
@@ -188,7 +193,9 @@ class Lifetime:
     (ids, kind, fid, aux1, aux2, ans_span)."""
 
     def __init__(self, rng, bank_part="train", stmts=2, filler_frac=0.3,
-                 n_stream_q=16, n_quiz=26, abstain_frac=0.12):
+                 n_stream_q=None, n_quiz=26, abstain_frac=0.12):
+        if n_stream_q is None:
+            n_stream_q = STREAM_Q
         self.rng = rng
         B = _BANK[bank_part]
         seen = set()
@@ -639,6 +646,10 @@ def main():
     ap.add_argument("--filler-frac", type=float, default=0.3)
     ap.add_argument("--abstain-frac", type=float, default=0.12)
     ap.add_argument("--abstain-warmup", type=float, default=0.5)
+    ap.add_argument("--n-c", type=int, default=5)
+    ap.add_argument("--n-p", type=int, default=10)
+    ap.add_argument("--bank-cap", type=int, default=0)
+    ap.add_argument("--n-stream-q", type=int, default=16)
     ap.add_argument("--eval-batch", type=int, default=48)
     ap.add_argument("--eval-batches", type=int, default=3)
     ap.add_argument("--seed", type=int, default=0)
@@ -650,12 +661,15 @@ def main():
     args = ap.parse_args()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(args.seed)
-    load_bank()
+    global N_C, N_P, STREAM_Q
+    N_C, N_P, STREAM_Q = args.n_c, args.n_p, args.n_stream_q
+    load_bank(cap=args.bank_cap)
     nv = build_vocab()
     UNKNOWN_IDS = enc_c(" unknown")
     build_idf()
     print(f"device={device} vocab={nv} unknown={UNKNOWN_IDS} "
-          f"idf built", flush=True)
+          f"idf built  world: {N_C}c/{N_P}p cap={args.bank_cap} "
+          f"streamq={STREAM_Q}", flush=True)
 
     run = None
     if args.wandb:
