@@ -419,11 +419,32 @@ for the build-the-circuit law. The walker's modifier interpreter is
 rung 2's smallest specimen: TWICE trained as an OPERATION (counter
 := 2), not a meaning — learned in ~30 steps.
 
-Next candidates: noisy demonstrations + exemplar-store arm
-(interface vs economy); lexicon > K (rent); richer walkers /
-programmable walks (rung 2 proper: around/after/reorder — where the
-fixed walk must become a learned PROGRAM over architectural ops);
-then SCAN-proper under the meta-protocol.
+v5 — SCAN-LITE, FROZEN KERNEL (toy_scan_icl.py; kernel local 1 s $0;
+both-arms run k6mjg1iw ~10 min ~$0.20): single-clause SCAN family
+(verbs/dirs/opposite/around/counting, ALL per-lifetime; frames V..VSDC).
+Kernel arm: ZERO trained parameters — atoms filed in the book,
+struct/count words learned by EXACT HYPOTHESIS ELIMINATION from one
+demo (enumerable program space; opposite/around are candidate
+PROGRAMS over the same repeat/emit kernel — NO new ops), execution by
+frozen templates. Result: 100.0 exact on every frame, including
+verbs never demonstrated inside any structure (add-jump at full
+strength), in one second, gradient-free end to end. AR contrast
+(3L/d96, full 120-token study stream in context, 4000 steps
+teacher-forced meta-training): train loss 0.13 but greedy exact
+28.2 (V) -> 10.9 (VD) -> 7.3 (VDC) -> 4.3 (VSDC) — learned local
+imitation, not execution; degrades monotonically with structure.
+Epistemic status: kernel 100 is near-tautological (correct algorithm
+in a deterministic world); the FINDINGS are (a) the kernel expressed
+a second grammar family with no new operations (first counter-
+evidence to the brittleness objection), (b) one-demo word learning
+incl. structural words, (c) the separation-of-concerns gap measured:
+computing acquisition vs optimizing toward it.
+
+Next candidates: noisy demos + exemplar-store arm (posteriors go
+soft; consolidation returns); lexicon > K (rent); connectors/
+multi-clause (order ops — the frozen-kernel discipline's next test);
+larger hypothesis spaces (where amortized/learned inference must
+replace enumeration — backprop's principled re-entry); SCAN-proper.
 
 ## Local environment (Windows)
 
