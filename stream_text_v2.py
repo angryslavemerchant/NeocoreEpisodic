@@ -138,6 +138,34 @@ def enc_c(text):
 
 
 UNKNOWN_IDS = None      # set after vocab build
+_IDF = None             # per-token inverse doc frequency (v2.2)
+
+
+def build_idf(n_sample=40):
+    """v2.2: IDF weights for payload pooling. v2.0/2.1 gate failures
+    traced to payload dilution — bank templates are long and varied,
+    so a flat doc-mean is mostly function words; the answer token
+    carries ~1/15 of the mass vs ~1/8 in v1's short templates. IDF
+    pooling hands the mass to rare tokens (names, answers)."""
+    global _IDF
+    import math
+    rng = random.Random(99)
+    df = {}
+    ndocs = 0
+    for _ in range(n_sample):
+        lt = Lifetime(rng)
+        for (ids, *_rest) in lt.docs:
+            ndocs += 1
+            for t in set(ids):
+                df[t] = df.get(t, 0) + 1
+    idf = torch.ones(_NVOCAB)
+    mx = math.log(ndocs + 1)
+    idf *= mx          # unseen tokens (fresh names) get max weight
+    for t, d in df.items():
+        if t < _NVOCAB:
+            idf[t] = math.log((ndocs + 1) / (d + 1)) + 0.1
+    _IDF = idf
+    return idf
 
 
 def nonce_person(rng):
@@ -220,14 +248,15 @@ class Lifetime:
         stmt_docs = []
         for f_i, texts in enumerate(facts):
             for t in texts:
-                stmt_docs.append((enc_c(t), "fact", f_i, -1, -1, None))
+                stmt_docs.append((enc_c(t), "fact", f_i, -1, -1, None,
+                                  0))
         rng.shuffle(stmt_docs)
         n_fill = int(len(stmt_docs) * filler_frac / (1 - filler_frac))
         docs = list(stmt_docs)
         for _ in range(n_fill):
             t = rng.choice(B["fillers"])
             docs.insert(rng.randrange(len(docs) + 1),
-                        (enc_c(t), "filler", -1, -1, -1, None))
+                        (enc_c(t), "filler", -1, -1, -1, None, 0))
         # last-statement position per fact (for min-gap placement)
         last_pos = {}
         for pos, d in enumerate(docs):
@@ -240,19 +269,30 @@ class Lifetime:
             if q is None:
                 continue
             earliest = 0
-            for f in q[6]:
+            for f in q[7]:
                 earliest = max(earliest, last_pos.get(f, 0) + MIN_GAP)
             if earliest < len(docs):
                 pos = rng.randrange(earliest, len(docs) + 1)
-                qdocs.append((pos, q[:6]))
+                qdocs.append((pos, q[:7]))
         for pos, q in sorted(qdocs, key=lambda x: -x[0]):
             docs.insert(pos, q)
         # final quiz
         for _ in range(n_quiz):
             q = self._make_q(B, abstain_frac)
             if q is not None:
-                docs.append(q[:6])
+                docs.append(q[:7])
         self.docs = docs
+
+    def _subj_pos(self, ids, subj):
+        """Last token index of the subject mention (read-1 aux hook)."""
+        for cand in (enc_c(" " + subj), enc_c(subj)):
+            n = len(cand)
+            if n == 0:
+                continue
+            for i in range(len(ids) - n, -1, -1):
+                if ids[i:i + n] == cand:
+                    return i + n - 1
+        return max(0, len(ids) - 1)
 
     def _make_q(self, B, abstain_frac):
         rng = self.rng
@@ -264,7 +304,8 @@ class Lifetime:
             ids = enc_c(text)
             a = list(UNKNOWN_IDS)
             span = (len(ids), len(ids) + len(a))
-            return (ids + a, "q_abstain", -1, -1, -1, span, [])
+            apos = self._subj_pos(ids, ghost)
+            return (ids + a, "q_abstain", -1, -1, -1, span, apos, [])
         qt = rng.choice(Q1 + Q2)
         p = rng.choice(self.persons)
         c = rng.choice(self.cos)
@@ -322,7 +363,11 @@ class Lifetime:
         a = enc_c(" " + ans)
         span = (len(ids), len(ids) + len(a))
         hop = 2 if qt in Q2 else 1
-        return (ids + a, f"q_h{hop}", -1, f1, f2, span, [f1, f2])
+        subj = c if qt in ("q_founded", "q_industry", "q_based_in",
+                           "q_makes") else p
+        apos = self._subj_pos(ids, subj)
+        return (ids + a, f"q_h{hop}", -1, f1, f2, span, apos,
+                [f1, f2])
 
 
 def build_batch(B, device, rng, bank_part="train", stmts=2,
@@ -337,9 +382,11 @@ def build_batch(B, device, rng, bank_part="train", stmts=2,
     aux2 = torch.full((B, D), -1, dtype=torch.long)
     ans_mask = torch.zeros(B, D, L_DOC, dtype=torch.bool)
     q_pos = torch.zeros(B, D, dtype=torch.long)
+    s_pos = torch.zeros(B, D, dtype=torch.long)
     kinds = [[None] * D for _ in range(B)]
     for b, lt in enumerate(lts):
-        for d, (ids, kind, fid, a1, a2, span) in enumerate(lt.docs):
+        for d, (ids, kind, fid, a1, a2, span, apos) in \
+                enumerate(lt.docs):
             ids = ids[:L_DOC]
             toks[b, d, :len(ids)] = torch.tensor(ids)
             fids[b, d] = fid
@@ -351,9 +398,10 @@ def build_batch(B, device, rng, bank_part="train", stmts=2,
                 e = min(e, L_DOC)
                 ans_mask[b, d, s:e] = True
                 q_pos[b, d] = s - 1
+                s_pos[b, d] = min(apos, L_DOC - 1)
     return (toks.to(device), fids.to(device), aux1.to(device),
             aux2.to(device), ans_mask.to(device), q_pos.to(device),
-            kinds, lts[0].n_facts)
+            s_pos.to(device), kinds, lts[0].n_facts)
 
 
 class TextStreamLM(nn.Module):
@@ -404,7 +452,9 @@ class TextStreamLM(nn.Module):
 
 
 def run_batch(model, batch, K, device, arm, aux_w):
-    (toks, fids, aux1, aux2, ans_mask, q_pos, kinds, n_facts) = batch
+    (toks, fids, aux1, aux2, ans_mask, q_pos, s_pos, kinds,
+     n_facts) = batch
+    idf = _IDF.to(device) if _IDF is not None else None
     B, D, L = toks.shape
     book = None
     slots = torch.zeros(B, n_facts, dtype=torch.long, device=device)
@@ -426,7 +476,11 @@ def run_batch(model, batch, K, device, arm, aux_w):
             with torch.no_grad():
                 emb = model.emb(sub)
                 npad = (sub != PAD).unsqueeze(-1).float()
-                mean = (emb * npad).sum(2) / npad.sum(2).clamp(min=1)
+                if idf is not None:
+                    w = idf[sub].unsqueeze(-1) * npad
+                else:
+                    w = npad
+                mean = (emb * w).sum(2) / w.sum(2).clamp(min=1e-6)
                 for j in range(c1 - c0):
                     fcol = fids[:, c0 + j]
                     if not bool((fcol >= 0).any()):
@@ -494,9 +548,12 @@ def run_batch(model, batch, K, device, arm, aux_w):
             if bool(is_q.any()):
                 bb, dd = torch.nonzero(is_q, as_tuple=True)
                 pos = q_pos[:, c0:c1][bb, dd]
+                spos = s_pos[:, c0:c1][bb, dd]
                 s1 = slots[bb, acol1[bb, dd]]
                 s2 = slots[bb, aux2[:, c0:c1][bb, dd]]
-                p1 = w1[bb, dd, pos, :].gather(
+                # read1 hooked at the SUBJECT mention, read2 at the
+                # pre-answer position (v1's working configuration)
+                p1 = w1[bb, dd, spos, :].gather(
                     1, s1.unsqueeze(1)).squeeze(1)
                 p2 = w2[bb, dd, pos, :].gather(
                     1, s2.unsqueeze(1)).squeeze(1)
@@ -596,8 +653,9 @@ def main():
     load_bank()
     nv = build_vocab()
     UNKNOWN_IDS = enc_c(" unknown")
-    print(f"device={device} vocab={nv} unknown={UNKNOWN_IDS}",
-          flush=True)
+    build_idf()
+    print(f"device={device} vocab={nv} unknown={UNKNOWN_IDS} "
+          f"idf built", flush=True)
 
     run = None
     if args.wandb:

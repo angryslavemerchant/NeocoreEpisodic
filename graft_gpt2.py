@@ -223,8 +223,9 @@ def main():
     W._NVOCAB = 50257
     W.PAD = 50256
     W.UNKNOWN_IDS = W.enc_c(" unknown")
+    W.build_idf()
     print(f"device={device} real-vocab graft; unknown="
-          f"{W.UNKNOWN_IDS}", flush=True)
+          f"{W.UNKNOWN_IDS} idf built", flush=True)
 
     run = None
     if args.wandb:
