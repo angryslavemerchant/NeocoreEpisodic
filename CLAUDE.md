@@ -597,7 +597,17 @@ Answers graded teacher-forced exact-match over multi-token spans.
 v1 wheels: harness-slot filing (fact-id), doc-mean-embedding
 content; live-theta arm instruments how far bag-of-embedding
 novelty-gate filing gets at BPE level (expected to degrade —
-informative, not gating). Plan (Ibanis-approved sequencing): this
+informative, not gating). RESULTS (local, 2500 steps then 6000):
+gate PASSED — at 6k steps live 82.6 hop1 / 99.2 hop2 vs dense
+7.8/13.1 (floor) and frozen ~1/2; HELD-OUT PARAPHRASES FREE (83.1/
+99.0 == trained); two-hop essentially solved, hop1 limited by
+5-token-exact name answers and still climbing at 6k. live-theta
+(bag-of-embedding novelty filing) CLOSED most of its gap with
+training (44/59 at 2.5k -> 78/93 at 6k): the embedding geometry
+organizes to make even naive filing workable — but the learned
+writer stays justified for paraphrase-robust keys. Book model's LM
+loss 0.29 vs dense 1.17: the memory also makes the stream itself
+predictable (the perplexity signature, visible in miniature). Plan (Ibanis-approved sequencing): this
 smoke -> co-design LLM template bank -> graft into pretrained
 124M (LoRA ladder: r16 -> r64 -> unfreeze-middle -> full FT) ->
 five-arm experiment (writable / frozen-at-eval / Meta-regime
