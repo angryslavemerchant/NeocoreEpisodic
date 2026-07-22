@@ -548,13 +548,15 @@ Readings:
    forever (no channel, by construction). Aux wheels annealed to 0
    with no wobble in BOTH worlds: the circuit stands without
    supervision at deployment AND at the end of meta-training.
-2. **The economy is load-bearing exactly where the campaign
-   predicted**: clean + ample capacity, live == exemplar (interface
-   suffices — lexicon lesson replicated in LM form). Add noise OR
-   scarcity and consolidation wins huge: exemplar-FIFO craters to
-   28-47 under noise while live holds ~90; live's filing stays
-   PERFECT (used=32=facts, zero merges) — running means are the
-   noise-vote consolidation in vector form.
+2. **CORRECTED 2026-07-22 (Ibanis's catch, verified by re-eval)**:
+   the noise-world exemplar collapse was CAPACITY STARVATION (128
+   statements into 64 slots), not a consolidation win. Exemplar with
+   K=128 TIES live under noise (94/93/88 vs 94/93/90): the soft read
+   over duplicate entries performs the same averaging/vote as the
+   running mean — interface-over-economy, third sighting. The
+   economy's real earned claim: SAME accuracy at 1/4 the storage
+   (32 slots vs 128) — compression, not accuracy. Requirements
+   track facts vs statements; that part stands.
 3. **Graceful degradation under forced joins**: live at K=16 (half
    the fact count) still ~2x exemplar everywhere — the v7 lexicon
    superposition result, third domain.
