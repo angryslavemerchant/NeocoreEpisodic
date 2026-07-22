@@ -643,10 +643,31 @@ same evening. Ops: two Vast phantom contracts (create reports
 success:False but creates anyway — always status-check + destroy
 after failed create; cause: launching onto an occupied machine).
 
-STANDING ALTERNATE ENTRY — AMORTIZED INFERENCE (propose-verify-file,
-spec above at v8): still the symbolic line's next build; motivation
-sharpened by v8 (removes the curriculum-ladder dependence). The two
-lines converge at host-model integration.
+## NEXT SESSION ENTRY POINT — REASONING-CORE LM (2026-07-22 pivot;
+## full interview-resolved spec in POINTS_OF_INTEREST session-close)
+
+The programs merged. Build rung 1 of the reasoning-core LM: a
+general small LM (10-30M, TinyStories-class corpus) with:
+- frozen pretrained causal encoder (unbounded KV cache = the archive)
+- K persistent core REGISTERS (32-64), residually updated by
+  per-token-admitted encoder tokens (train chunked: admission
+  queries from chunk-boundary core state; infer per-token)
+- admission scored by core-state-modulated QK, sampled exact-K
+- decoder attends ONLY [local window || core] — never the cache
+  (free-decoder law: admission is the sole long-range route)
+- arms: learned-gaze / RANDOM-GAZE (the conscience) / matched-
+  compute dense / (later) gated-state baseline
+- bar: ppl ~parity with dense + recall/composition wins on
+  stream-world EVAL PROBES; kill if learned <= random gaze
+- S=1 core first; S=2 iff admission-thrash in the maps
+- expect ignition fights: apply the bisect curricula (hard regimes
+  arrive after circuit formation), aux-with-anneal available
+Open receipt (parked, low priority): the 124M graft never produced
+its table (3 OOMs -> per-chunk fix landed -> final attempt zombied).
+Memory-line v2.3 gate result stands as that campaign's checkpoint.
+
+STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
+at v8): the symbolic line's next build if the program returns there.
 
 ## Local environment (Windows)
 
