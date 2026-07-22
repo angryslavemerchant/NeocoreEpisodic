@@ -144,7 +144,7 @@ def patched_run_batch(model, batch, K, device, arm, aux_w):
 
 def train_arm(model, arm, steps, B, K, lr_base, lr_new, device, tag,
               aux_anneal, stmts, filler_frac, log_every=50,
-              log_fn=None):
+              log_fn=None, abstain_frac=0.12, abstain_warmup=0.5):
     new_ids = {id(p) for p in model.new_params()}
     base = [p for p in model.parameters() if id(p) not in new_ids]
     opt = torch.optim.AdamW(
@@ -158,8 +158,9 @@ def train_arm(model, arm, steps, B, K, lr_base, lr_new, device, tag,
         aux_w = max(0.0, 1.0 - step / max(steps * aux_anneal, 1)) \
             if (model.use_book and aux_anneal > 0
                 and arm == "live") else 0.0
+        af = abstain_frac if step > steps * abstain_warmup else 0.0
         batch = build_batch(B, device, rng, stmts=stmts,
-                            filler_frac=filler_frac)
+                            filler_frac=filler_frac, abstain_frac=af)
         loss, st = patched_run_batch(model, batch, K, device, arm,
                                      aux_w)
         opt.zero_grad()
