@@ -459,7 +459,14 @@ class TextStreamLM(nn.Module):
             (w2.reshape(shp) if w2 is not None else None)
 
 
-def run_batch(model, batch, K, device, arm, aux_w):
+def run_batch(model, batch, K, device, arm, aux_w, do_backward=False,
+              loss_norm=40.0):
+    """do_backward: call .backward() per CHUNK and free the graph —
+    required at GPT-2 scale (the whole-lifetime graph OOMs 96 GB;
+    every loss here is chunk-local because the book is non-
+    differentiable, so per-chunk backward is exact, not an
+    approximation). loss_norm: constant divisor replacing the
+    end-of-lifetime question-count normalization."""
     (toks, fids, aux1, aux2, ans_mask, q_pos, s_pos, kinds,
      n_facts) = batch
     idf = _IDF.to(device) if _IDF is not None else None
@@ -477,6 +484,7 @@ def run_batch(model, batch, K, device, arm, aux_w):
     curve = {}
     lm_sum, lm_n = 0.0, 0
     for c0 in range(0, D, CHUNK):
+        chunk_loss = torch.zeros((), device=device)
         c1 = min(c0 + CHUNK, D)
         sub = toks[:, c0:c1]
         # writes for this chunk's fact docs (before its forward)
@@ -515,7 +523,7 @@ def run_batch(model, batch, K, device, arm, aux_w):
                 logits[:, :, :-1].reshape(-1, logits.shape[-1])
                 [keep.reshape(-1)],
                 tgt.reshape(-1)[keep.reshape(-1)])
-            loss = loss + lm
+            chunk_loss = chunk_loss + lm
             lm_sum += float(lm.detach())
             lm_n += 1
         amask = ans_mask[:, c0:c1, 1:] & keep
@@ -524,7 +532,7 @@ def run_batch(model, batch, K, device, arm, aux_w):
                 logits[:, :, :-1].reshape(-1, logits.shape[-1])
                 [amask.reshape(-1)],
                 tgt.reshape(-1)[amask.reshape(-1)])
-            loss = loss + 2.0 * ans_ce
+            chunk_loss = chunk_loss + 2.0 * ans_ce
         # aux + metrics per question doc in chunk
         with torch.no_grad():
             pred = logits[:, :, :-1].argmax(-1)
@@ -565,8 +573,15 @@ def run_batch(model, batch, K, device, arm, aux_w):
                     1, s1.unsqueeze(1)).squeeze(1)
                 p2 = w2[bb, dd, pos, :].gather(
                     1, s2.unsqueeze(1)).squeeze(1)
-                loss = loss - aux_w * (torch.log(p1 + 1e-9)
-                                       + torch.log(p2 + 1e-9)).mean()
+                chunk_loss = chunk_loss - aux_w * (
+                    torch.log(p1 + 1e-9)
+                    + torch.log(p2 + 1e-9)).mean()
+        if do_backward:
+            if chunk_loss.requires_grad:
+                (chunk_loss / loss_norm).backward()
+            loss = loss + chunk_loss.detach()
+        else:
+            loss = loss + chunk_loss
     out = {k: v[0] / max(v[1], 1) for k, v in stats.items()}
     out["lm_loss"] = lm_sum / max(lm_n, 1)
     out["curve"] = {f"{k}_b{b}": v[0] / max(v[1], 1)

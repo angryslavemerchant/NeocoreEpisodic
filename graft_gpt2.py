@@ -127,7 +127,7 @@ class GraftLM(nn.Module):
             (w2.reshape(shp) if w2 is not None else None)
 
 
-def patched_run_batch(model, batch, K, device, arm, aux_w):
+def patched_run_batch(model, batch, K, device, arm, aux_w, **kw):
     """metabook: inject the trained ParamBook instead of a fresh Book
     (frozen-at-eval by construction: no rule writes exist for it)."""
     if arm == "metabook":
@@ -136,10 +136,10 @@ def patched_run_batch(model, batch, K, device, arm, aux_w):
         try:
             W.Book = lambda *a, **k: book
             return run_batch(model, batch, K, device, "metabook-x",
-                             aux_w)
+                             aux_w, **kw)
         finally:
             W.Book = orig
-    return run_batch(model, batch, K, device, arm, aux_w)
+    return run_batch(model, batch, K, device, arm, aux_w, **kw)
 
 
 def train_arm(model, arm, steps, B, K, lr_base, lr_new, device, tag,
@@ -164,10 +164,11 @@ def train_arm(model, arm, steps, B, K, lr_base, lr_new, device, tag,
         batch = build_batch(B, device, rng, stmts=stmts,
                             filler_frac=filler_frac, abstain_frac=af,
                             n_stream_q=sq)
-        loss, st = patched_run_batch(model, batch, K, device, arm,
-                                     aux_w)
         opt.zero_grad()
-        loss.backward()
+        # per-chunk backward inside run_batch (whole-lifetime graph
+        # OOMs 96 GB at GPT-2 scale; chunk-local losses make it exact)
+        loss, st = patched_run_batch(model, batch, K, device, arm,
+                                     aux_w, do_backward=True)
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
         if step == 1 or step % log_every == 0:
