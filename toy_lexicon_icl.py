@@ -339,12 +339,13 @@ def run_lifetime(model, E, device, K, training, arm="live",
         book = LexBook(E, K, model.d, device)
         if arm == "oracle":
             with torch.no_grad():
+                nn_ = min(P, K)         # oracle can only fill K drawers
                 forms = torch.arange(P, device=device)
                 kv = F.normalize(model.emb(forms), dim=-1)
                 pv = model.emb(lex + 32)
-                book.keys[:, :P] = kv.unsqueeze(0)
-                book.pays[:, :P] = pv
-                book.counts[:, :P] = book.cap
+                book.keys[:, :nn_] = kv[:nn_].unsqueeze(0)
+                book.pays[:, :nn_] = pv[:, :nn_]
+                book.counts[:, :nn_] = book.cap
     loss = torch.zeros((), device=device)
     stats = []
     for e in range(EPS):
