@@ -614,6 +614,35 @@ five-arm experiment (writable / frozen-at-eval / Meta-regime
 backprop-slots / dense / long-context / LoRA-per-stream). Est.
 ~$10/full pass, 2-3 nights total.
 
+IGNITION-CONDITIONS BISECT (2026-07-22 evening, 7 cloud runs on PRO
+6000s, ~$3.5 total, wandb neocore-stream bisectA/B1/B2/C/D/D1/D2 +
+textv2.0-2.2 failures): v2 world (bank templates, 55 facts, fillers,
+interleaved questions, abstention) failed to ignite THREE times;
+incremental guesses (aux length, abstention curriculum, IDF pooling
++ subject-hook aux) all failed; diagnose_v2.py acquitted key
+geometry (same-entity cos ~0.42 either template regime). Factorial
+bisect verdicts (all single-variable, 2.5-3.5k steps each, h1/h2 at
+book-phase end):
+    A  v1-parity world            85/97  IGNITES
+    B1 +full 44-template bank     74/92  ignites (slower)
+    B2 +full 55-fact world        82/94  ignites (slower)
+    C  diversity x size           ~50s@3.5k  ignites (slower still)
+    D1 +30% fillers               ignites
+    D2 +16 MID-STREAM QUESTIONS   16/21  SUPPRESSED 5x  << THE WALL
+    D  full stream machinery      13/17  fails (+abstain basin)
+LAW (bootstrap-whisper, ignition edition): partial-book retrieval —
+questions asked while the book is still filling — is the hardest
+regime and PREVENTS the read circuit from forming if present from
+step one; the same regime is harmless curriculum once the circuit
+exists. Remedy shipped: stream-question warmup (35%) + abstention
+warmup (60%) — hard regimes arrive after ignition. Also: 'unknown'
+as a universally-valid answer is a degenerate basin pre-ignition;
+answer-side floors (dense) ~2-5/8-15 from closed-set guessing.
+v2.3 assembled gate (all axes + both curricula, 6k steps) launched
+same evening. Ops: two Vast phantom contracts (create reports
+success:False but creates anyway — always status-check + destroy
+after failed create; cause: launching onto an occupied machine).
+
 STANDING ALTERNATE ENTRY — AMORTIZED INFERENCE (propose-verify-file,
 spec above at v8): still the symbolic line's next build; motivation
 sharpened by v8 (removes the curriculum-ladder dependence). The two
