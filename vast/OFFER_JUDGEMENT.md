@@ -174,3 +174,11 @@ a broken-hardware floor, not a Blackwell performance bar — rerun
 - m55313 (EPYC 7R32, CA, 5090) — clean stream-world run 2026-07-22.
 - m144477 (EPYC 7C13, Estonia, 5090) — clean stream-world run
   2026-07-22, ~0.35 s/step on the d256/6L toy; rel 0.945 was fine.
+- machine 67286 (i7-14700K, Sweden, PRO 6000): silent zombie #2 —
+  "success, running" 72 min, zero onstart output (2026-07-22).
+  rel 0.945-class hosts now 1-for-2 on this failure mode.
+- RULE (2026-07-22): OFFER IDS GO STALE once a machine is rented —
+  relaunching on a previously-used offer id yields create-failure
+  WITH a phantom billing contract (success:False + new_contract).
+  Always re-run `search` for fresh ids; always `status` + destroy
+  after any failed create. Four phantoms caught today, all this.
