@@ -15,3 +15,5 @@ POINTS_OF_INTEREST.md
 # Vast.ai automation — never commit these
 vast/secrets.env
 .vast/
+
+results_stream/
