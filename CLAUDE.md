@@ -400,10 +400,30 @@ to the vector-store INTERFACE alone; noise/capacity/drift are where
 interface and economy separate (the proto-vs-exemplar decomposition,
 symbolic edition).
 
-Next candidates: iterative composer (productivity repair — the
-loop's first mandated appearance); noisy demonstrations + exemplar
-arm; lexicon > K; function words per-lifetime (rung 2); then
-SCAN-proper under the meta-protocol.
+v4 — ITERATIVE COMPOSER (toy_composer_icl.py; run snu6ucah, ~7 min,
+~$0.15): walker (hardcoded cursor/counter/advance walk; learned only
+emission head + modifier interpreter via exact expected-CE over
+repeat combos) vs AR (same tower+book, causal token-by-token
+emission). Both trained on 2-primitive queries only:
+
+               len2        len3        len4
+    walker   100/100     100/100     100/100
+    ar       100/100      69/0        45/0    (per-position/exact)
+
+PRODUCTIVITY BY CONSTRUCTION. The rung-1 story closes symmetric:
+systematicity came free when the lexicon became a circuit's contents
+(v2); productivity comes free when iteration becomes a circuit's
+walk (v4). Sequential emission alone does NOT suffice (AR decays
+classically) — what matters is WHO OWNS the iteration. Fifth domain
+for the build-the-circuit law. The walker's modifier interpreter is
+rung 2's smallest specimen: TWICE trained as an OPERATION (counter
+:= 2), not a meaning — learned in ~30 steps.
+
+Next candidates: noisy demonstrations + exemplar-store arm
+(interface vs economy); lexicon > K (rent); richer walkers /
+programmable walks (rung 2 proper: around/after/reorder — where the
+fixed walk must become a learned PROGRAM over architectural ops);
+then SCAN-proper under the meta-protocol.
 
 ## Local environment (Windows)
 
