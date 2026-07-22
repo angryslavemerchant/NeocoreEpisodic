@@ -458,6 +458,42 @@ recover information BEYOND one-word-per-slot — superposition as the
 emergent overflow strategy. Zero-shot (model never saw overflow in
 meta-training) -> learned-superposition headroom if trained scarce.
 
+v8 — SCAN-PROPER, REAL DATASET (scan_proper.py, 2026-07-21, local,
+2 s total, $0; data/scan gitignored, re-fetch via curl from
+github.com/brendenlake/SCAN): brittleness bout #3, pulled forward at
+Ibanis's request ("when are we moving to an actual dataset?"). First
+external benchmark of the program. Word ROLES are no longer given —
+the learner infers role AND program for all 13 real words by exact
+elimination over a computation-shaped hypothesis space (VERB=emission
+seq incl. empty; DIR=atom; STRUCT in {d^k v, (d v)^k, k<=4} — 8
+programs; COUNT in {2,3,4}; CONN=swap bit) under an authored clause
+template V [S] [D] [C], clause [N] clause. Pre-registered: oracle
+schema 100 on train; no new ops admitted; 100/100/100 predicted.
+
+    split          train    TEST (exact match)   published seq2seq
+    simple         100.0    100.0  (n=4182)         ~99.8
+    addprim_jump   100.0    100.0  (n=7706)         ~1.2
+    length         100.0    100.0  (n=3920)         ~13.8
+
+All predictions held; zero contradictions; no op #4 needed (around =
+(d v)^4, opposite = d^2 v, turn = EMPTY-emission verb, after = swap
+bit — all discovered, not named). Acquisition: 15-18 conclusive
+demos from the natural corpus; sorted-shortest prefix sweep: 8 demos
+= 6/13 words, 24 = 11/13 (25.9), 32 = 13/13 -> 100.0 on the full
+add-jump test set. Zero parameters, zero gradients, ~1 s per split.
+Findings beyond the score: (a) RANDOM 320-demo subsets score 0.0 —
+the one-unknown-per-demo eliminator needs the corpus's short-command
+curriculum ladder (bootstrap-whisper law, symbolic edition; sighting
+#4); joint multi-demo inference (= the amortized-inference build) is
+what would remove that dependence. (b) The famous add-jump split is
+trivialized by the pointer-array factorization exactly as v2
+predicted: jump's 1467 train occurrences are ALL isolated, and it
+composes perfectly anyway. Epistemic status: like v5, near-
+tautological GIVEN the schema fits — the finding is that the same
+8-program kernel from the toys fit the real grammar with no new
+operations, and that the length split (the field's wall) is
+length-blind by construction.
+
 NEXT SESSION ENTRY POINT — AMORTIZED INFERENCE (the last empty seat
 in the division-of-labor table): hypothesis spaces too large to
 enumerate; a small learned net PROPOSES a word's program/binding,
@@ -467,9 +503,10 @@ cheap), and only verified conclusions get FILED. Propose-verify-file
 Build: extend the SCAN world with wide program schemas (e.g. k-field
 words, 2^k >> enumerable), inference net vs enumeration-while-it-
 lasts vs random-proposal baselines; measure demos-to-acquisition vs
-space size. Then: SCAN-proper/PCFG under the frozen-kernel rule
-(brittleness bout #3), host-model integration (organs as layers in
-a real transformer).
+space size. v8 sharpened the motivation: amortized/joint inference
+also removes the curriculum-ladder dependence (random-demo 0.0).
+Then: PCFG (Hupkes) under the frozen-kernel rule, host-model
+integration (organs as layers in a real transformer).
 
 ## Local environment (Windows)
 
