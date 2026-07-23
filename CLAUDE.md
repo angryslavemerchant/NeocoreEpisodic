@@ -643,6 +643,59 @@ same evening. Ops: two Vast phantom contracts (create reports
 success:False but creates anyway — always status-check + destroy
 after failed create; cause: launching onto an occupied machine).
 
+## RUNG-1 CAMPAIGN DAY 1 (2026-07-22/23, rcore_lm.py; ~$15 total,
+## 2 real runs + 8 toy gates + ~6 phantom/zombie ops events)
+
+Ibanis made THREE mid-build corrections, each now load-bearing:
+(1) core = FILTER not registers (buffer = the K selected token
+states themselves; selection-over-superposition, vision law);
+(2) UNIFIED STACK — one decoder-only model, lower windowed layers
+ARE the archive-builders, core mid-stack, upper layers see
+[window || buffer] only; no pretrained/frozen parts;
+(3) PURPOSE reframe: the experiment grades "can the model learn
+WHERE TO LOOK" (bufhit@question = primary metric, built); recall
+is downstream. Dense "sees the answer" trivially — context, not
+competitor.
+
+RESULTS (wandb neocore-rcore, artifacts verified):
+- Frozen-archive rung 1 (TinyStories-8M encoder): KILL CRITERION
+  FIRED both runs — learned ~= random ~= s2 on far recall; smoking
+  gun = RANDGAZE INVARIANCE (same recall with a random buffer: the
+  reader never used the buffer at all). S2 gaze aimed 3x better
+  (0.35 vs 0.11) with zero recall payoff. Dense twin: 86.6 far-h1 /
+  68.5 held-out-paraphrase / 38.3 h2 — full attention + trainable
+  representations ignite lookup easily at 18M/8k steps. Core arms
+  WIN story ppl in both runs (6.71 vs 7.10; 7.14 vs 7.30).
+- Unified-stack toy gates v3-v6: reader blocked by ARCHIVE DRIFT —
+  new law sighting (bootstrap-whisper, representation edition):
+  **the read circuit must form BEFORE its substrate starts
+  moving.** Bisect proof: frozen-at-init lower layer -> reader
+  climbs (chance->30); training lower layer -> chance forever.
+  low-freeze curriculum: circuit survives the unfreeze and keeps
+  improving (oracle 31, plateau = toy world ceiling). Learned-gaze
+  bootstrap still dead even with annealed gaze-aux (v6) — the
+  three-way chicken-and-egg (archive<->gaze<->reader) does not
+  self-ignite with generic interfaces.
+- Ops: --thresholds takes vast/-prefixed path (bare name crashed
+  benchmark -> GATE_FAILED self-destroyed 3 healthy boxes);
+  offer-id lists go stale in ~15 min (4 phantom contracts — always
+  re-search before launch); m37505 one-strike silent zombie;
+  parallel single-arm instances work well (~13 min/arm on PRO 6000).
+
+STATUS: paused at an ARCHITECTURE DECISION (Ibanis: "think, don't
+patch"). On the table (POI session entry has the full argument):
+A identity-preserving buffer entries [token-emb || lower-state]
+  (stationary channel by construction, kills drift without freeze);
+B replace generic cross-attn with the proven cosine ReadHead
+  (build-the-circuit law: the read organ that ignited in 5 domains);
+C top-k+eps during ignition instead of Gumbel sampling (buffer
+  churn destabilizes the reader; sampled-K was validated for
+  PERCEPTION consumers, maybe not READER consumers);
+D fallback scope: keep gaze-aux permanent as instrument, claim =
+  gaze informativeness (bufhit vs random), defer self-contained
+  loop to rung 2.
+Recommendation A+B (+C during ignition). AWAITING IBANIS.
+
 ## NEXT SESSION ENTRY POINT — REASONING-CORE LM (2026-07-22 pivot;
 ## full interview-resolved spec in POINTS_OF_INTEREST session-close)
 
