@@ -280,12 +280,15 @@ class RCoreLM(nn.Module):
         pol = gaze_override or self.policy
         q = self.query0.expand(B, -1, -1)
         bufs, admits = [empty], []
+        self._scores = []       # (aux ignition: WITH grad when armed)
         for t in range(1, nch):
             n = t * self.C
             for _r in range(self.S):
                 s = torch.einsum("bqd,bnd->bqn",
                                  q, kk[:, :n]) * self.scale
                 s = s.max(1).values / self.tau
+                if getattr(self, "collect_scores", False):
+                    self._scores.append(s)
                 if pol == "random":
                     key = torch.rand_like(s.detach().float())
                 elif pol == "oracle":
@@ -429,14 +432,37 @@ def toy_model(arm, device, seed=0):
                    cross_at=(1, 2)).to(device)
 
 
-def toy_step(model, batch, boost=8.0):
+def gaze_aux_loss(model, fact_mask):
+    """Aux ignition (annealed to 0): logistic push of admission
+    scores toward fact tokens — breaks the selection<->retrieval
+    chicken-and-egg (bare gate-whisper never bootstraps; the
+    vocab-ICL protocol). The claim to defend: aim SURVIVES anneal."""
+    aux = 0.0
+    n_terms = 0
+    fm = fact_mask[:, :-1]
+    for s in model._scores:
+        f = fm[:, :s.shape[1]].to(s.device)
+        if not bool(f.any()) or bool(f.all()):
+            continue
+        aux = aux - F.logsigmoid(s)[f].mean() \
+            - F.logsigmoid(-s)[~f].mean()
+        n_terms += 1
+    return aux / max(n_terms, 1)
+
+
+def toy_step(model, batch, boost=8.0, aux_w=0.0):
     toks, fact_mask, ans_tgt, queries, ob = batch
     inp, tgt = toks[:, :-1], toks[:, 1:]
+    model.collect_scores = aux_w > 0 and model.use_core \
+        and model.policy == "learned"
     logits, admits = model(inp, oracle_bias=ob)
     ce = F.cross_entropy(logits.reshape(-1, logits.shape[-1]),
                          tgt.reshape(-1), reduction="none")
     w = 1.0 + boost * ans_tgt.reshape(-1).float()
     loss = (ce * w).sum() / w.sum()
+    if model.collect_scores and model._scores:
+        loss = loss + aux_w * gaze_aux_loss(model, fact_mask)
+    model.collect_scores = False
     return loss, logits, admits
 
 
@@ -544,8 +570,10 @@ def toy_main(args):
             if nfr and step == nfr and arm != "ofrozen":
                 for p_ in model.low.parameters():
                     p_.requires_grad = True
+            aux_w = args.gaze_aux * max(
+                0.0, 1.0 - step / max(args.toy_steps * 0.5, 1))
             batch = build_toy_batch(32, rng, device)
-            loss, _, _ = toy_step(model, batch)
+            loss, _, _ = toy_step(model, batch, aux_w=aux_w)
             opt.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -792,6 +820,10 @@ def train_real_arm(model, SW, pool, args, arm, device, log_fn):
             far_gap=far_gap)
         inp, tgt = toks[:, :-1], toks[:, 1:]
         collect = (step % args.log_every == 0)
+        aux_w = args.gaze_aux * max(
+            0.0, 1.0 - step / max(args.steps * 0.5, 1))
+        model.collect_scores = aux_w > 0 and model.use_core \
+            and model.policy == "learned"
         with torch.autocast(device_type="cuda",
                             dtype=torch.bfloat16,
                             enabled=(device == "cuda")):
@@ -801,6 +833,9 @@ def train_real_arm(model, SW, pool, args, arm, device, log_fn):
                 tgt.reshape(-1), reduction="none")
             w = 1.0 + args.ans_boost * ans_tgt.reshape(-1).float()
             loss = (ce * w).sum() / w.sum()
+            if model.collect_scores and model._scores:
+                loss = loss + aux_w * gaze_aux_loss(model, fmask)
+        model.collect_scores = False
         opt.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -1013,6 +1048,7 @@ def main():
     ap.add_argument("--low-layers", type=int, default=3)
     ap.add_argument("--w-low", type=int, default=0)
     ap.add_argument("--low-freeze", type=float, default=0.0)
+    ap.add_argument("--gaze-aux", type=float, default=0.0)
     ap.add_argument("--heads", type=int, default=8)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--warmup", type=int, default=300)
