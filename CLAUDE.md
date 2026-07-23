@@ -758,12 +758,32 @@ h1 0.20 with a provably empty retrieval channel) — no memory
 claims exist until restrictions kill guessing. All as RCORE_SPEC
 section 5 predicted for the base.
 
+UNGATED 16k EXTENSION (2026-07-23 eve, ~$3, killed by user call at
+~8.2k steps; wandb neocore-simplecore sc-simplecore-s16000-*): tested
+"maybe the 8k gaze surge was undertrained." VERDICT: the opposite —
+the ungated channel is a BOOM-BUST oscillator that ends in
+detonation. Movie (batch 24, gate-init 5.0/bias-init 0.0 =
+reproduced pre-gate config via new --gate-init/--bias-init flags):
+gaze climbed to ~0.5 by step 3.4k (above the 8k run's 0.38 peak) ->
+collapsed to 0.03 at ~5.2k with loss creep 1.68->1.9 -> partial
+rebuild -> LOSS BLOW-UP at 7.8k (1.89 -> 4.46, recall zeroed).
+Reading: predator-prey co-adaptation through an undamped channel —
+gaze sharpens, slot statistics shift faster than G tracks, G's
+cheapest fix is forcing bland selection, cycle repeats and
+amplifies. The 8k run's "late surge" was cycle 1 caught mid-boom.
+The Flamingo gate is load-bearing DAMPING, not cosmetics; ungated
+config closed permanently. Ops: batch 96 OOMs a 96GB card at step 1
+— the float32 CE logits path (~19GB + grads at B=96, 24.5k vocab)
+is the VRAM hog; B<=64 without a chunked-CE rewrite. Fat-batch
+exchange-rate question (B64 twin) launched but destroyed unresolved
+at the quits call.
+
 NEXT: (a) restriction stage per RCORE_SPEC section 5 (window G
 then F — necessity arrives; twins can finally diverge on
 retrieval; gaze gets its first real job); (b) tame the slot-channel
-seed lottery (gate schedule / slot norm); (c) 16k-step runs — the
-interesting phases start ~5.5k and 8k ends mid-movie; (d) cosine
-tail as channel-opening stabilizer arm.
+seed lottery (gate schedule / slot norm); (c) 16k-step runs for the
+GATED config (ungated's 16k verdict is in above; gated 16k still
+unwatched); (d) cosine tail as channel-opening stabilizer arm.
 
 ## NEXT SESSION ENTRY POINT — REASONING-CORE LM (2026-07-22 pivot;
 ## full interview-resolved spec in POINTS_OF_INTEREST session-close)
