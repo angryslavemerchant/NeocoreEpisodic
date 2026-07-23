@@ -745,12 +745,25 @@ disk). Shop mid-band ($1.00-1.10, rel >= 0.994). Offer lists stale
 in ~15 min. m37505 one-strike zombie. wandb run names now
 uniquified (two same-name runs confused a chart read).
 
-NEXT: (a) read seed-1 replications; (b) if stability story holds,
-restriction stage per RCORE_SPEC section 5 (window G then F —
-necessity arrives, twins can finally diverge on retrieval);
-(c) 16k-step run — the interesting phases start ~5.5k and 8k runs
-end mid-movie; (d) consider cosine tail for channel-opening
-turbulence.
+SEED-1 REPLICATIONS (same evening; both artifacts verified):
+    core gated s1 6.27 / registers s1 6.32 (no collapse; s0's
+    registers collapse = seed lottery, ~1-in-4 slot-run hazard).
+FINAL BASE-STAGE VERDICT (replication-backed): (1) slot content is
+a PASSENGER — core == registers within seed, randgaze ties at eval,
+bufhit ~0; ALL ppl gains are the register/furniture effect (large:
+6.3-8.0 vs dense 9.83). (2) The stabilizer story from s0 died on
+replication — replicate before believing. (3) Recall at the
+unrestricted base is fluency-scaled GUESSING (core s1 "scores"
+h1 0.20 with a provably empty retrieval channel) — no memory
+claims exist until restrictions kill guessing. All as RCORE_SPEC
+section 5 predicted for the base.
+
+NEXT: (a) restriction stage per RCORE_SPEC section 5 (window G
+then F — necessity arrives; twins can finally diverge on
+retrieval; gaze gets its first real job); (b) tame the slot-channel
+seed lottery (gate schedule / slot norm); (c) 16k-step runs — the
+interesting phases start ~5.5k and 8k ends mid-movie; (d) cosine
+tail as channel-opening stabilizer arm.
 
 ## NEXT SESSION ENTRY POINT — REASONING-CORE LM (2026-07-22 pivot;
 ## full interview-resolved spec in POINTS_OF_INTEREST session-close)
