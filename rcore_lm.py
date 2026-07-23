@@ -182,13 +182,17 @@ class RCoreLM(nn.Module):
     def __init__(self, vocab, d=256, layers=8, low_layers=3,
                  heads=8, max_t=2048, window=64, chunk=64, k_buf=48,
                  n_query=8, policy="learned", use_core=True,
-                 full_attn=False, cross_at=None, s_rounds=1):
+                 full_attn=False, cross_at=None, s_rounds=1,
+                 w_low=None):
         super().__init__()
         assert policy in ("learned", "random", "oracle")
         assert max_t % chunk == 0
         assert 0 < low_layers < layers
         assert window >= chunk - 1 or full_attn or not use_core
         self.d, self.W, self.C = d, window, chunk
+        # archive layers may use a NARROWER window (local summaries;
+        # wide windows dilute a fact out of its own token's state)
+        self.Wl = w_low if w_low else window
         self.K, self.n_query = k_buf, n_query
         # s_rounds: gaze passes per boundary — select, update queries
         # from what was found, reselect (weight-shared; the pixel-era
@@ -240,13 +244,14 @@ class RCoreLM(nn.Module):
     def tau_val(self):
         return float(self.tau.detach())
 
-    def _mask(self, T, device):
+    def _mask(self, T, device, w=None):
         """Bool mask (True = blocked) — dtype-safe under autocast.
         NOTE: stacked local layers give the decoder an effective
-        reach of layers*W tokens; anything farther is provably
+        reach of sum-of-layer-windows; anything farther is provably
         core-only (the leak test + the `far` question split both
-        use that bound)."""
-        key = (T, device)
+        bound it by layers*W)."""
+        w = self.W if w is None else w
+        key = (T, device, w, self.full_attn)
         if key not in self._masks:
             i = torch.arange(T, device=device)
             if self.full_attn:
@@ -254,7 +259,7 @@ class RCoreLM(nn.Module):
             else:
                 j = i.unsqueeze(0)
                 ii = i.unsqueeze(1)
-                keep = (j <= ii) & (j >= ii - self.W)
+                keep = (j <= ii) & (j >= ii - w)
             self._masks[key] = ~keep
         return self._masks[key]
 
@@ -317,8 +322,9 @@ class RCoreLM(nn.Module):
         B, T = toks.shape
         x = self.emb(toks) + self.pos[:, :T]
         mask = self._mask(T, toks.device)
+        mlow = self._mask(T, toks.device, self.Wl)
         for blk in self.low:
-            x = blk(x, mask)          # archive-builder (windowed)
+            x = blk(x, mlow)          # archive-builder (windowed)
         cores = None
         admits = []
         if self.use_core:
@@ -349,11 +355,39 @@ VALS = (275, 300)
 V_TOY = 300
 
 
+_TOY_PERM = None
+
+
+def _toy_perm():
+    """Fixed Markov successor over filler tokens: the toy stream has
+    LEARNABLE structure, so the trained archive layer gets a real LM
+    signal to stabilize on (pure-noise fillers made the unified
+    stack's archive representation a random walk — v4 gate fix)."""
+    global _TOY_PERM
+    if _TOY_PERM is None:
+        g = random.Random(31337)
+        p = list(range(10, 250))
+        g.shuffle(p)
+        _TOY_PERM = {10 + i: p[i] for i in range(240)}
+    return _TOY_PERM
+
+
 def build_toy_batch(B, rng, device, n_fact=5, n_q=3):
-    """Streams of length T+1: fillers + n_fact [FACT name val] triples
-    in the first 3 chunks + n_q [Q name val] queries beyond the
-    window. name->val is random PER STREAM (unsmearable)."""
-    toks = torch.randint(10, 250, (B, T_TOY + 1))
+    """Streams of length T+1: Markov fillers + n_fact
+    [FACT name val] triples in the first 3 chunks + n_q [Q name val]
+    queries beyond the window. name->val random PER STREAM
+    (unsmearable); filler transitions FIXED across streams
+    (smearable — that is the point: the lower layer learns them)."""
+    perm = _toy_perm()
+    toks = torch.empty(B, T_TOY + 1, dtype=torch.long)
+    for b in range(B):
+        cur = rng.randrange(10, 250)
+        row = []
+        for _ in range(T_TOY + 1):
+            row.append(cur)
+            cur = perm[cur] if rng.random() < 0.85 \
+                else rng.randrange(10, 250)
+        toks[b] = torch.tensor(row)
     fact_mask = torch.zeros(B, T_TOY + 1, dtype=torch.bool)
     ans_tgt = torch.zeros(B, T_TOY, dtype=torch.bool)
     queries = []
@@ -381,15 +415,17 @@ def build_toy_batch(B, rng, device, n_fact=5, n_q=3):
 
 def toy_model(arm, device, seed=0):
     # k_buf=16 >= the 15 fact tokens: oracle's ceiling stays ~100.
-    # Unified stack: 1 archive layer + 2 upper (reach 3*W unchanged)
+    # Unified stack v4: 1 archive layer (w_low=8 — local summaries)
+    # + 3 upper (matches the decoder depth that ignited in v2/v3);
+    # reach = 8 + 3*32 = 104 < the 130-token question gap.
     torch.manual_seed(seed)
-    return RCoreLM(V_TOY, d=64, layers=3, low_layers=1, heads=4,
+    return RCoreLM(V_TOY, d=64, layers=4, low_layers=1, heads=4,
                    max_t=T_TOY, window=W_TOY, chunk=C_TOY, k_buf=16,
-                   n_query=4,
+                   n_query=4, w_low=8,
                    policy={"oracle": "oracle", "random": "random"}
                    .get(arm, "learned"),
                    use_core=(arm != "nocore"),
-                   cross_at=(0, 1)).to(device)
+                   cross_at=(1, 2)).to(device)
 
 
 def toy_step(model, batch, boost=8.0):
@@ -609,6 +645,7 @@ def build_fact_stream(SW, rng, T, pool, bank_part="train",
         else [EOT] * need
     questions, fact_spans = [], []
     fact_end = {}
+    spans_by_fid = {}
     for (doc_ids, kind, fid, a1, a2, span, apos) in docs:
         base = len(ids)
         ids.extend(doc_ids)
@@ -616,11 +653,15 @@ def build_fact_stream(SW, rng, T, pool, bank_part="train",
         if kind == "fact":
             fact_spans.append((base, base + len(doc_ids)))
             fact_end[fid] = base + len(doc_ids)
+            spans_by_fid.setdefault(fid, []).append(
+                (base, base + len(doc_ids)))
         if span is not None and kind.startswith("q_"):
             s, e = span
             sup = max(fact_end.get(a1, 0), fact_end.get(a2, 0))
+            sup_spans = spans_by_fid.get(a1, []) \
+                + spans_by_fid.get(a2, [])
             questions.append((kind, base + s, base + e,
-                              base - sup > far_gap))
+                              base - sup > far_gap, sup_spans))
     assert len(ids) == T + 1
     fmask = torch.zeros(T + 1, dtype=torch.bool)
     for s, e in fact_spans:
@@ -644,10 +685,10 @@ def build_real_batch(SW, B, T, rng, pool, fact_frac, device,
                 stmts, filler_frac, far_gap)
             toks[b] = torch.tensor(ids)
             fact_mask[b] = fm
-            for kind, s, e, fr in qs:
+            for kind, s, e, fr, sup in qs:
                 e = min(e, T)
                 ans_tgt[b, s - 1:e - 1] = True
-                questions.append((b, kind, s, e, fr))
+                questions.append((b, kind, s, e, fr, sup))
         else:
             toks[b] = torch.tensor(story_slice(pool, rng, T + 1))
     return (toks.to(device), fact_mask, ans_tgt.to(device),
@@ -662,13 +703,34 @@ def grade(logits, toks, questions):
     split by whether the question is beyond decoder reach (far)."""
     pred = logits.argmax(-1)
     agg = {k: [0, 0] for k in GKEYS}
-    for b, kind, s, e, fr in questions:
+    for b, kind, s, e, fr, _sup in questions:
         ok = bool((pred[b, s - 1:e - 1] == toks[b, s:e]).all())
         key = ("h1_" if kind == "q_h1" else "h2_") \
             + ("far" if fr else "near")
         agg[key][0] += int(ok)
         agg[key][1] += 1
     return agg
+
+
+def buffer_hit(admits, questions, chunk):
+    """THE PRIMARY GAZE METRIC (Ibanis reframe: 'can the model learn
+    where to look?'): for each far question, was ANY token of its
+    supporting fact statements in the buffer the decoder read while
+    answering — selection quality, independent of the reader."""
+    hits = tot = 0
+    if not admits:
+        return 0.0, 0
+    for b, kind, s, e, fr, sup in questions:
+        if not fr or not sup:
+            continue
+        u = s // chunk               # question's chunk index
+        if u < 1 or u - 1 >= len(admits):
+            continue
+        idx = admits[u - 1][b].tolist()
+        tot += 1
+        hits += int(any(s0 <= i < e0 for i in idx
+                        for s0, e0 in sup))
+    return hits / max(tot, 1), tot
 
 
 def gaze_stats(admits, fact_mask, n_fact_rows, chunk):
@@ -786,13 +848,19 @@ def eval_real(model, SW, pool_val, pool_train, args, device,
                 agg[k][0] += g[k][0]
                 agg[k][1] += g[k][1]
             gz, rec = gaze_stats(admits, fmask, args.batch, args.c)
+            bh, bh_n = buffer_hit(admits, qs, args.c)
             gz_sum += gz
             rec_sum += rec
             gz_n += 1
+            bh_sum = out.get(f"_bh{part}", 0.0) + bh * bh_n
+            bhn_sum = out.get(f"_bhn{part}", 0) + bh_n
+            out[f"_bh{part}"], out[f"_bhn{part}"] = bh_sum, bhn_sum
         sfx = "" if part == "train" else "_hold"
         for k in GKEYS:
             out[f"{k}{sfx}"] = agg[k][0] / max(agg[k][1], 1)
         out[f"nq{sfx}"] = sum(agg[k][1] for k in GKEYS)
+        out[f"bufhit{sfx}"] = out.pop(f"_bh{part}", 0.0) \
+            / max(out.pop(f"_bhn{part}", 1), 1)
         if part == "train":
             out["gaze_fact"] = gz_sum / max(gz_n, 1)
             out["gaze_rec"] = rec_sum / max(gz_n, 1)
@@ -850,7 +918,7 @@ def real_main(args):
                         low_layers=args.low_layers,
                         heads=args.heads, max_t=args.t,
                         window=args.w, chunk=args.c, k_buf=args.k,
-                        n_query=args.n_query,
+                        n_query=args.n_query, w_low=args.w_low,
                         **arm_cfg[arm]).to(device)
         n_par = sum(p.numel() for p in model.parameters())
         print(f"\n=== arm {arm}: {n_par/1e6:.1f}M trainable params",
@@ -870,8 +938,9 @@ def real_main(args):
 
     print("\n=== RCORE RUNG-1 RESULTS")
     names = list(results)
-    keys = ("ppl", "h1_far", "h2_far", "h1_near", "h2_near",
-            "h1_far_hold", "h2_far_hold", "gaze_fact", "gaze_rec")
+    keys = ("bufhit", "bufhit_hold", "ppl", "h1_far", "h2_far",
+            "h1_near", "h2_near", "h1_far_hold", "h2_far_hold",
+            "gaze_fact", "gaze_rec")
     print("  metric        " + "  ".join(f"{n:>16s}" for n in names))
     for k in keys:
         row = "  ".join(f"{results[n].get(k, float('nan')):16.3f}"
@@ -918,6 +987,7 @@ def main():
     ap.add_argument("--d", type=int, default=256)
     ap.add_argument("--layers", type=int, default=8)
     ap.add_argument("--low-layers", type=int, default=3)
+    ap.add_argument("--w-low", type=int, default=0)
     ap.add_argument("--heads", type=int, default=8)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--warmup", type=int, default=300)
