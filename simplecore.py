@@ -188,6 +188,13 @@ class SimpleCore(nn.Module):
             self.core = Core(d, heads, core_layers, k_set, n_gaze,
                              s_loops, mode, policy)
             self.slot_type = nn.Parameter(torch.randn(1, 1, d) * 0.02)
+            # slots enter near-SILENT and earn their volume (the
+            # Flamingo gate, both sides of attention): content gain
+            # tanh(0.1)~=0.1, column logit bias -4 => ~2% mass.
+            # At gain 0 / bias -inf the model IS the dense twin —
+            # ppl parity becomes the floor by construction.
+            self.slot_gate = nn.Parameter(torch.tensor(0.1))
+            self.slot_bias = nn.Parameter(torch.tensor(-4.0))
         self._masks = {}
 
     def _causal(self, L, device):
@@ -232,13 +239,14 @@ class SimpleCore(nn.Module):
         keys = self.core.key_proj(self.core.key_ln(x))
         members, gaze = self.core.init_state(B)
         slots, admits = [], []
+        gate = torch.tanh(self.slot_gate)
         for u in range(1, nch):
             n = u * self.C
             members, gaze, idx = self.core.session(
                 x[:, :n], keys[:, :n], members, gaze,
                 policy=policy, training=self.training)
-            slots.append(members + self.slot_type
-                         + self.pos[:, n:n + 1])
+            slots.append((members + self.slot_type
+                          + self.pos[:, n:n + 1]) * gate)
             if collect:
                 admits.append(idx.detach().cpu())
         real_ix, slot_at, L = self._interleave_ix(T, dev)
@@ -246,12 +254,24 @@ class SimpleCore(nn.Module):
         y[:, real_ix] = x
         for s_i, pos0 in enumerate(slot_at):
             y[:, pos0:pos0 + self.K] = slots[s_i]
-        gm = self._causal(L, dev)
         if mask_slots:                      # identity test: slots
-            gm = gm.clone()                 # invisible to attention
+            gm = self._causal(L, dev).clone()   # fully invisible
             for pos0 in slot_at:
                 gm[:, pos0:pos0 + self.K] = True
             gm.fill_diagonal_(False)
+        else:
+            key = ("fm", L, dev)
+            if key not in self._masks:
+                cb = self._causal(L, dev)
+                fm = torch.where(
+                    cb, torch.tensor(float("-inf"), device=dev),
+                    torch.tensor(0.0, device=dev))
+                col = torch.zeros(L, device=dev)
+                for pos0 in slot_at:
+                    col[pos0:pos0 + self.K] = 1.0
+                self._masks[key] = (fm, col)
+            fm, col = self._masks[key]
+            gm = fm + col.unsqueeze(0) * self.slot_bias
         for blk in self.g:
             y = blk(y, gm)
         logits = self.head(self.norm(y[:, real_ix]))
@@ -345,10 +365,13 @@ def train_arm(model, SW, pool, lut, args, arm, device, log_fn):
             gz, rec = gaze_stats(admits, fmask, n_fr, args.c)
             h1 = g["h1_far"][0] / max(g["h1_far"][1], 1)
             h2 = g["h2_far"][0] / max(g["h2_far"][1], 1)
+            sg = float(torch.tanh(model.slot_gate)) \
+                if model.use_core else 0.0
+            sb = float(model.slot_bias) if model.use_core else 0.0
             print(f"[{arm:10s}] step {step:5d} loss {loss:.3f} "
                   f"h1f {h1:.2f} h2f {h2:.2f} gaze {gz:.3f} "
-                  f"rec {rec:.2f} ({time.time()-t0:.0f}s)",
-                  flush=True)
+                  f"rec {rec:.2f} sg {sg:.2f} sb {sb:.1f} "
+                  f"({time.time()-t0:.0f}s)", flush=True)
             if log_fn:
                 log_fn({f"{arm}/loss": float(loss), f"{arm}/h1": h1,
                         f"{arm}/h2": h2, f"{arm}/gaze": gz,
