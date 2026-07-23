@@ -169,7 +169,8 @@ class SimpleCore(nn.Module):
     def __init__(self, vocab, d=256, f_layers=3, g_layers=5,
                  heads=8, max_t=2048, chunk=64, use_core=True,
                  k_set=32, n_gaze=4, s_loops=2, core_layers=2,
-                 mode="accumulate", policy="learned"):
+                 mode="accumulate", policy="learned",
+                 gate_init=0.1, bias_init=-4.0):
         super().__init__()
         assert max_t % chunk == 0
         self.d, self.C, self.use_core = d, chunk, use_core
@@ -193,8 +194,11 @@ class SimpleCore(nn.Module):
             # tanh(0.1)~=0.1, column logit bias -4 => ~2% mass.
             # At gain 0 / bias -inf the model IS the dense twin —
             # ppl parity becomes the floor by construction.
-            self.slot_gate = nn.Parameter(torch.tensor(0.1))
-            self.slot_bias = nn.Parameter(torch.tensor(-4.0))
+            # gate_init=5.0/bias_init=0.0 reproduces the pre-gate
+            # UNGATED config (tanh(5)~=1, no column bias; the params
+            # exist but sit at saturation / zero).
+            self.slot_gate = nn.Parameter(torch.tensor(gate_init))
+            self.slot_bias = nn.Parameter(torch.tensor(bias_init))
         self._masks = {}
 
     def _causal(self, L, device):
@@ -327,7 +331,8 @@ def make_model(arm, args, vocab, device):
         chunk=args.c, use_core=(arm != "dense"), k_set=args.k,
         n_gaze=args.n_gaze, s_loops=args.s, core_layers=args.core_layers,
         mode=args.core_mode,
-        policy=("random" if arm == "random" else "learned")
+        policy=("random" if arm == "random" else "learned"),
+        gate_init=args.gate_init, bias_init=args.bias_init
     ).to(device)
     if arm == "registers":
         # control: slots exist but carry NO selected content — pure
@@ -461,6 +466,8 @@ def main():
     ap.add_argument("--n-gaze", type=int, default=4)
     ap.add_argument("--core-layers", type=int, default=2)
     ap.add_argument("--core-mode", type=str, default="accumulate")
+    ap.add_argument("--gate-init", type=float, default=0.1)
+    ap.add_argument("--bias-init", type=float, default=-4.0)
     ap.add_argument("--d", type=int, default=256)
     ap.add_argument("--f-layers", type=int, default=3)
     ap.add_argument("--g-layers", type=int, default=5)
