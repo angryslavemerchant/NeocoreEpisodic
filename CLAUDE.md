@@ -682,19 +682,22 @@ RESULTS (wandb neocore-rcore, artifacts verified):
   re-search before launch); m37505 one-strike silent zombie;
   parallel single-arm instances work well (~13 min/arm on PRO 6000).
 
-STATUS: paused at an ARCHITECTURE DECISION (Ibanis: "think, don't
-patch"). On the table (POI session entry has the full argument):
-A identity-preserving buffer entries [token-emb || lower-state]
-  (stationary channel by construction, kills drift without freeze);
-B replace generic cross-attn with the proven cosine ReadHead
-  (build-the-circuit law: the read organ that ignited in 5 domains);
-C top-k+eps during ignition instead of Gumbel sampling (buffer
-  churn destabilizes the reader; sampled-K was validated for
-  PERCEPTION consumers, maybe not READER consumers);
-D fallback scope: keep gaze-aux permanent as instrument, claim =
-  gaze informativeness (bufhit vs random), defer self-contained
-  loop to rung 2.
-Recommendation A+B (+C during ignition). AWAITING IBANIS.
+RESOLVED (same day, design conversation with Ibanis): the A-D patch
+menu was superseded by a ground-up re-derivation. **The agreed base
+architecture is frozen in RCORE_SPEC.md (v1)** — read it before
+touching rcore_lm.py. Headlines: in-line core (selected positions
+route THROUGH a small dense-attention reasoning core, everything
+else flows F->G untouched; core=identity == dense EXACTLY); gaze
+computed by the core's own gaze tokens (self-directed selection,
+loops S times, accumulate-vs-replace as an arm pair); serialization
+analysis (chain length = persistence grain; per-token viable at
+~2-5x with big batch + CUDA graphs, chunked ~1.5-3x = workhorse);
+restrictions (windows on F and G) are what MAKE the core
+load-bearing and arrive as later additions/curriculum, training
+starts dense-identical (easy gradients — the drift-law answer);
+primary metric = bufhit@question (gaze-first purpose). NEXT: build
+ladder step 1-2 (base impl + identity test + dense-parity sanity),
+rcore_lm.py needs a substantial rewrite to the spec.
 
 ## NEXT SESSION ENTRY POINT — REASONING-CORE LM (2026-07-22 pivot;
 ## full interview-resolved spec in POINTS_OF_INTEREST session-close)
