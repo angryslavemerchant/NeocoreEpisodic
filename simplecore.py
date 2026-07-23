@@ -240,15 +240,19 @@ class SimpleCore(nn.Module):
         members, gaze = self.core.init_state(B)
         slots, admits = [], []
         gate = torch.tanh(self.slot_gate)
+        reg_only = getattr(self, "register_only", False)
         for u in range(1, nch):
             n = u * self.C
-            members, gaze, idx = self.core.session(
-                x[:, :n], keys[:, :n], members, gaze,
-                policy=policy, training=self.training)
+            if reg_only:
+                members = self.core.members0.expand(B, -1, -1)
+            else:
+                members, gaze, idx = self.core.session(
+                    x[:, :n], keys[:, :n], members, gaze,
+                    policy=policy, training=self.training)
+                if collect:
+                    admits.append(idx.detach().cpu())
             slots.append((members + self.slot_type
                           + self.pos[:, n:n + 1]) * gate)
-            if collect:
-                admits.append(idx.detach().cpu())
         real_ix, slot_at, L = self._interleave_ix(T, dev)
         y = torch.zeros(B, L, self.d, device=dev, dtype=x.dtype)
         y[:, real_ix] = x
@@ -317,7 +321,7 @@ def identity_test(device="cpu"):
 
 def make_model(arm, args, vocab, device):
     torch.manual_seed(args.seed)
-    return SimpleCore(
+    m = SimpleCore(
         vocab, d=args.d, f_layers=args.f_layers,
         g_layers=args.g_layers, heads=args.heads, max_t=args.t,
         chunk=args.c, use_core=(arm != "dense"), k_set=args.k,
@@ -325,6 +329,12 @@ def make_model(arm, args, vocab, device):
         mode=args.core_mode,
         policy=("random" if arm == "random" else "learned")
     ).to(device)
+    if arm == "registers":
+        # control: slots exist but carry NO selected content — pure
+        # learned register/sink tokens (isolates the furniture
+        # effect from the core's selection+reasoning)
+        m.register_only = True
+    return m
 
 
 def train_arm(model, SW, pool, lut, args, arm, device, log_fn):
@@ -495,9 +505,10 @@ def main():
     run = None
     if args.wandb:
         import wandb
+        import time as _t
         run = wandb.init(project=args.wandb_project,
                          name=f"sc-{args.arms.replace(',', '-')}"
-                              f"-s{args.steps}",
+                              f"-s{args.steps}-{int(_t.time()) % 100000}",
                          config=vars(args))
     log_fn = (lambda x: run.log(x)) if run else None
 
