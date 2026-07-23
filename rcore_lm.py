@@ -162,13 +162,18 @@ class RCoreLM(nn.Module):
     def __init__(self, vocab, d=256, layers=6, heads=8, max_t=2048,
                  window=64, chunk=64, k_buf=48, n_query=8,
                  enc_dim=256, policy="learned", use_core=True,
-                 full_attn=False, cross_at=None):
+                 full_attn=False, cross_at=None, s_rounds=1):
         super().__init__()
         assert policy in ("learned", "random", "oracle")
         assert max_t % chunk == 0
         assert window >= chunk - 1 or full_attn or not use_core
         self.d, self.W, self.C = d, window, chunk
         self.K, self.n_query = k_buf, n_query
+        # s_rounds: gaze passes per boundary — select, update queries
+        # from what was found, reselect (weight-shared; the pixel-era
+        # recursive-admission result, transplanted). Decoder consumes
+        # the FINAL round's buffer. S=1 == single-pass gaze.
+        self.S = s_rounds
         self.gaze_on = True
         self.policy, self.use_core, self.full_attn = \
             policy, use_core, full_attn
@@ -248,34 +253,36 @@ class RCoreLM(nn.Module):
         bufs, admits = [empty], []
         for t in range(1, nch):
             n = t * self.C
-            s = torch.einsum("bqd,bnd->bqn", q, kk[:, :n]) * self.scale
-            s = s.max(1).values / self.tau
-            if pol == "random":
-                key = torch.rand_like(s.detach().float())
-            elif pol == "oracle":
-                key = oracle_bias[:, :n] \
-                    + torch.rand_like(s.detach().float())
-            else:
-                # Gumbel top-K == sampling w/o replacement from
-                # softmax(s); stochastic at eval too — the policy
-                gum = -torch.log(-torch.log(
-                    torch.rand_like(s.detach().float())
-                    .clamp_(1e-9, 1 - 1e-9)))
-                key = s.detach().float() + gum
-            k = min(self.K, n)
-            idx = key.topk(k, dim=1).indices
-            sel = e.gather(
-                1, idx.unsqueeze(-1).expand(-1, -1, self.d))
-            if pol == "learned":
-                gate = torch.sigmoid(
-                    s.gather(1, idx)).unsqueeze(-1)
-                sel = sel * (1 + gate)     # scorer/tau gradient path
-            if k < self.K:                 # pad early buffers
-                sel = torch.cat(
-                    [sel, empty[:, :self.K - k]], dim=1)
-            # filter-state update: queries see what they gathered
-            dq, _ = self.q_update(q, sel, sel, need_weights=False)
-            q = self.q_norm(q + dq)
+            for _r in range(self.S):
+                s = torch.einsum("bqd,bnd->bqn",
+                                 q, kk[:, :n]) * self.scale
+                s = s.max(1).values / self.tau
+                if pol == "random":
+                    key = torch.rand_like(s.detach().float())
+                elif pol == "oracle":
+                    key = oracle_bias[:, :n] \
+                        + torch.rand_like(s.detach().float())
+                else:
+                    # Gumbel top-K == sampling w/o replacement from
+                    # softmax(s); stochastic at eval too — the policy
+                    gum = -torch.log(-torch.log(
+                        torch.rand_like(s.detach().float())
+                        .clamp_(1e-9, 1 - 1e-9)))
+                    key = s.detach().float() + gum
+                k = min(self.K, n)
+                idx = key.topk(k, dim=1).indices
+                sel = e.gather(
+                    1, idx.unsqueeze(-1).expand(-1, -1, self.d))
+                if pol == "learned":
+                    gate = torch.sigmoid(
+                        s.gather(1, idx)).unsqueeze(-1)
+                    sel = sel * (1 + gate)  # scorer/tau gradient path
+                if k < self.K:              # pad early buffers
+                    sel = torch.cat(
+                        [sel, empty[:, :self.K - k]], dim=1)
+                # filter-state update: queries see what they gathered
+                dq, _ = self.q_update(q, sel, sel, need_weights=False)
+                q = self.q_norm(q + dq)
             bufs.append(sel)
             if collect:
                 admits.append(idx.detach().cpu())
@@ -857,6 +864,10 @@ def real_main(args):
     arm_cfg = {
         "learned": dict(policy="learned", use_core=True,
                         full_attn=False),
+        "learned-s2": dict(policy="learned", use_core=True,
+                           full_attn=False, s_rounds=2),
+        "learned-s3": dict(policy="learned", use_core=True,
+                           full_attn=False, s_rounds=3),
         "random": dict(policy="random", use_core=True,
                        full_attn=False),
         "dense": dict(policy="learned", use_core=False,
