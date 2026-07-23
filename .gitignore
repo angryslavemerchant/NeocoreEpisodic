@@ -17,3 +17,7 @@ vast/secrets.env
 .vast/
 
 results_stream/
+
+# rcore data caches + checkpoints (rebuilt on-instance)
+stories_*.npy
+*.pt
