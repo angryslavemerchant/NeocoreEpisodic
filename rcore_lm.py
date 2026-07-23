@@ -700,16 +700,27 @@ def gaze_stats(admits, fact_mask, n_fact_rows, chunk):
     return num / max(den, 1e-9), rec / max(len(admits), 1e-9)
 
 
-def enc_forward(enc, inp, device):
-    with torch.no_grad(), torch.autocast(
+def enc_forward(enc, inp, device, train_enc=False):
+    """train_enc: archive states join the graph — the encoder learns
+    to encode what the gaze finds worth selecting (gradient reaches
+    it ONLY through selected tokens + scorer keys; the free-decoder
+    law is untouched)."""
+    ctx = torch.enable_grad() if train_enc else torch.no_grad()
+    with ctx, torch.autocast(
             device_type="cuda", dtype=torch.bfloat16,
             enabled=(device == "cuda")):
-        return enc(inp).last_hidden_state.float()
+        h = enc(inp).last_hidden_state.float()
+    return h if train_enc else h.detach()
 
 
 def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
-    opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
-                            weight_decay=0.01)
+    train_enc = args.train_enc and model.use_core
+    groups = [{"params": model.parameters(), "lr": args.lr}]
+    if train_enc:
+        enc.train()
+        groups.append({"params": enc.parameters(),
+                       "lr": args.enc_lr})
+    opt = torch.optim.AdamW(groups, weight_decay=0.01)
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda s: min(1.0, (s + 1) / max(args.warmup, 1)))
     model.train()
@@ -726,8 +737,8 @@ def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
             far_gap=far_gap)
         inp, tgt = toks[:, :-1], toks[:, 1:]
         collect = (step % args.log_every == 0)
-        enc_h = enc_forward(enc, inp, device) if model.use_core \
-            else None
+        enc_h = enc_forward(enc, inp, device, train_enc) \
+            if model.use_core else None
         with torch.autocast(device_type="cuda",
                             dtype=torch.bfloat16,
                             enabled=(device == "cuda")):
@@ -740,6 +751,8 @@ def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
         opt.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        if train_enc:
+            nn.utils.clip_grad_norm_(enc.parameters(), 1.0)
         opt.step()
         sched.step()
         if collect or step == 1:
@@ -878,6 +891,12 @@ def real_main(args):
     models, results = {}, {}
     for arm in args.arms.split(","):
         arm = arm.strip()
+        if args.train_enc and models:      # fresh archive per arm —
+            enc = AutoModel.from_pretrained(  # no cross-arm leakage
+                args.enc_name).to(device).eval()
+            enc.requires_grad_(False)
+        if args.train_enc:
+            enc.requires_grad_(True)
         torch.manual_seed(args.seed)
         model = RCoreLM(50257, d=args.d, layers=args.layers,
                         heads=args.heads, max_t=args.t,
@@ -967,6 +986,8 @@ def main():
                     default=2_000_000)
     ap.add_argument("--enc-name", type=str,
                     default="roneneldan/TinyStories-8M")
+    ap.add_argument("--train-enc", action="store_true")
+    ap.add_argument("--enc-lr", type=float, default=1e-4)
     ap.add_argument("--arms", type=str,
                     default="learned,random,dense")
     ap.add_argument("--eval-story-batches", type=int, default=8)
