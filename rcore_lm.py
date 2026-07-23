@@ -510,6 +510,7 @@ def toy_main(args):
     for name, v in checks:
         print(f"  {'PASS' if v else 'FAIL'}  {name}")
     print(f"TOY GATE {'PASSED' if ok else 'FAILED'}")
+    return ok
 
 
 # ---------------------------------------------------------------------------
@@ -903,6 +904,7 @@ def real_main(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--toy", action="store_true")
+    ap.add_argument("--preflight", action="store_true")
     ap.add_argument("--toy-steps", type=int, default=2000)
     ap.add_argument("--toy-arms", type=str,
                     default="oracle,learned,random,nocore")
@@ -944,7 +946,15 @@ def main():
     ap.add_argument("--wandb_project", type=str,
                     default="neocore-rcore")
     args = ap.parse_args()
-    if args.toy:
+    if args.preflight:
+        # one-instance pipeline: toy gate first; only a PASS rolls
+        # into the real run (a FAIL exits nonzero -> instance stays
+        # alive for inspection per run_training.sh)
+        if not toy_main(args):
+            import sys
+            sys.exit(1)
+        real_main(args)
+    elif args.toy:
         toy_main(args)
     else:
         real_main(args)
