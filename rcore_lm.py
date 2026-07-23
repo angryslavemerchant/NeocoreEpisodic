@@ -79,6 +79,18 @@ SMOKE LOG:
      scorer quality). Buffer >> registers (41 vs 17 same budget).
      Rate limiter diagnosed as read-path gain (cross init 0.005,
      scorer grads ~1e-8). v3: cross init 0.02 + 4000-step horizon.
+  v3 (4000 steps, local): oracle 64.7 / learned 32.2 / random 12.4 /
+     nocore 4.1 — all still climbing; init change was NOT the rate
+     limiter (identical curve to v2 through 2k). Continuous slow
+     circuit growth, not a phase jump.
+  v3b-cloud (8000 steps, m68306 PRO 6000, ~80 s/arm): oracle 74.2 /
+     LEARNED 55.3 (gaze 0.466, tau -> 0.38: hard commitment) /
+     random 15.1. 3/4 checks PASS incl. learned >= max(2x random,
+     40); only oracle>=85 short — slow asymptote (43/65/74 at
+     2k/4k/8k), a toy-decoder convergence-speed issue, not a
+     circuit-validity issue. Kill-criterion signal decisive at toy
+     scale: learned 3.7x random. Next: 20k-step gate horizon
+     (checks unchanged).
 """
 
 import argparse
