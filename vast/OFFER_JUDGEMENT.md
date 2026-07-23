@@ -182,3 +182,15 @@ a broken-hardware floor, not a Blackwell performance bar — rerun
   WITH a phantom billing contract (success:False + new_contract).
   Always re-run `search` for fresh ids; always `status` + destroy
   after any failed create. Four phantoms caught today, all this.
+
+## Ops ledger addendum (2026-07-22, rcore campaign)
+
+- **`--thresholds` takes a REPO-ROOT-relative path**: pass
+  `vast/thresholds_hf_light.json`, NOT the bare filename. A bare
+  filename makes benchmark.py crash (FileNotFoundError), the crash
+  exits nonzero, onstart reads it as GATE_FAILED and SELF-DESTROYS a
+  perfectly healthy machine. This executed three healthy boxes in 30
+  minutes (m61489, m100187, m68306 x1 each) before a KEEP_ALIVE
+  diagnostic caught the traceback. When several instances on
+  DIFFERENT hosts die at the gate in a row, suspect the gate, not
+  the hosts. m61489 remains known-good.
