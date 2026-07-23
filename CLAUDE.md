@@ -699,6 +699,59 @@ primary metric = bufhit@question (gaze-first purpose). NEXT: build
 ladder step 1-2 (base impl + identity test + dense-parity sanity),
 rcore_lm.py needs a substantial rewrite to the spec.
 
+## SIMPLECORE CAMPAIGN (2026-07-23 afternoon; simplecore.py;
+## RCORE_SPEC.md v1 is the frozen design — READ IT FIRST)
+
+Built to Ibanis's re-derived architecture in one afternoon: dense
+F(3) -> in-line core (K=32 working set, 4 gaze tokens whose outputs
+ARE the next loop's queries, S=2 loops, accumulate) -> dense G(5);
+core output delivered as K slot tokens per 64-token boundary inside
+ONE interleaved causal sequence; Flamingo-style gates (content gain
+tanh(0.1), column logit bias -4) so slots enter near-silent; reduced
+vocab 24,495 (13.5M params); identity test BIT-EXACT (masked slots
+== dense). NO scaffolding anywhere (no boost/aux/curricula —
+pressure knobs are diagnosis tools now, per Ibanis).
+
+Base-stage results (wandb neocore-simplecore, all artifacts
+verified; plain 20%-fact mix, 8k steps, T=2048):
+
+    arm                     ppl     late-training     gaze/bufhit
+    dense twin             9.83     stable            —
+    core ungated          10.93     spike@7.4k        0.38/0.34 (!)
+    CORE GATED             7.98     SMOOTH            0.00/0.00
+    inert registers       28.84     COLLAPSE@>4k      —
+    (gated core + random gaze at eval: ppl 7.99 — content
+     irrelevant at INFERENCE)
+
+Readings (n=1 each — seed-1 replications of gated-core and
+registers launched, verify before trusting):
+1. UNGATED run: gaze SELF-ORGANIZED toward facts unpaid (0.38 vs
+   0.196 neutral; bufhit 0.34 vs 0.22 random) — first spontaneous
+   where-to-look signal of the program. Its late loss spike
+   co-timed with the gaze surge = channel coming online unmanaged.
+2. GATED core beat dense by 19% ppl, smooth throughout; but its
+   gaze went sink-like (earliest tokens, fact-gaze 0.000) and
+   randgaze-at-eval ties => the win is NOT retrieval content.
+3. Registers control (same slots, static content) COLLAPSED late =>
+   the simple furniture/register-token story is rejected; adaptive
+   core content appears to STABILIZE the slot channel during
+   training even though it is not read for prediction at eval.
+   Weird, novel-shaped, needs the seed replications.
+4. Overhead: gated core 0.31 s/step vs dense 0.14 (2.2x, in the
+   predicted envelope; registers 0.18 => core sessions ~= 0.13).
+Ops: price-FLOOR offers are the lemon cluster (4 dense boots lost
+to it; keep-alive autopsy: "PRO 6000" at 75 bf16 TFLOPS, 218 MB/s
+disk). Shop mid-band ($1.00-1.10, rel >= 0.994). Offer lists stale
+in ~15 min. m37505 one-strike zombie. wandb run names now
+uniquified (two same-name runs confused a chart read).
+
+NEXT: (a) read seed-1 replications; (b) if stability story holds,
+restriction stage per RCORE_SPEC section 5 (window G then F —
+necessity arrives, twins can finally diverge on retrieval);
+(c) 16k-step run — the interesting phases start ~5.5k and 8k runs
+end mid-movie; (d) consider cosine tail for channel-opening
+turbulence.
+
 ## NEXT SESSION ENTRY POINT — REASONING-CORE LM (2026-07-22 pivot;
 ## full interview-resolved spec in POINTS_OF_INTEREST session-close)
 
