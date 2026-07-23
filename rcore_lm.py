@@ -532,8 +532,18 @@ def toy_main(args):
         opt = torch.optim.AdamW(model.parameters(), lr=1e-3,
                                 weight_decay=0.01)
         rng = random.Random(args.seed + 1)
+        # low-freeze curriculum: the read circuit must form BEFORE
+        # its substrate starts moving (ofrozen bisect: frozen low ->
+        # reader climbs; training low -> chance forever)
+        nfr = int(args.toy_steps * args.low_freeze)
+        if nfr and arm != "ofrozen":
+            for p_ in model.low.parameters():
+                p_.requires_grad = False
         t0 = time.time()
         for step in range(1, args.toy_steps + 1):
+            if nfr and step == nfr and arm != "ofrozen":
+                for p_ in model.low.parameters():
+                    p_.requires_grad = True
             batch = build_toy_batch(32, rng, device)
             loss, _, _ = toy_step(model, batch)
             opt.zero_grad()
@@ -758,6 +768,11 @@ def gaze_stats(admits, fact_mask, n_fact_rows, chunk):
 def train_real_arm(model, SW, pool, args, arm, device, log_fn):
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
                             weight_decay=0.01)
+    # archive-stability curriculum (ofrozen bisect, toy gate v5)
+    nfr = int(args.steps * args.low_freeze) if model.use_core else 0
+    if nfr:
+        for p_ in model.low.parameters():
+            p_.requires_grad = False
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda s: min(1.0, (s + 1) / max(args.warmup, 1)))
     model.train()
@@ -765,6 +780,9 @@ def train_real_arm(model, SW, pool, args, arm, device, log_fn):
     far_gap = args.layers * args.w
     t0 = time.time()
     for step in range(1, args.steps + 1):
+        if nfr and step == nfr:
+            for p_ in model.low.parameters():
+                p_.requires_grad = True
         sq = 0 if step <= args.steps * args.sq_warmup \
             else args.n_stream_q
         toks, fmask, ans_tgt, qs = build_real_batch(
@@ -994,6 +1012,7 @@ def main():
     ap.add_argument("--layers", type=int, default=8)
     ap.add_argument("--low-layers", type=int, default=3)
     ap.add_argument("--w-low", type=int, default=0)
+    ap.add_argument("--low-freeze", type=float, default=0.0)
     ap.add_argument("--heads", type=int, default=8)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--warmup", type=int, default=300)
