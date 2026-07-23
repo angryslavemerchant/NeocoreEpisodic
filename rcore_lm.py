@@ -4,9 +4,12 @@ CLAUDE.md entry point + POI session close).
 A general small LM with the missing middle timescale built as
 architecture:
 
-  archive   frozen pretrained causal encoder (TinyStories-8M) run over
-            the whole stream — unbounded KV cache, perfect memory,
-            never touched by the decoder directly.
+  archive   the model's OWN lower layers (v3 unified stack, Ibanis):
+            sliding-window causal attention only — their per-token
+            states are the archive, retained for the whole stream
+            (unbounded at inference), never touched by the upper
+            stack directly. Trained end to end: long-range gradient
+            reaches them only through being selected.
   core      a selective FILTER, not a store (v2, Ibanis's mid-build
             correction; selection over superposition — the vision-era
             law). At every C-token chunk boundary the K-token BUFFER
@@ -91,6 +94,17 @@ SMOKE LOG:
      circuit-validity issue. Kill-criterion signal decisive at toy
      scale: learned 3.7x random. Next: 20k-step gate horizon
      (checks unchanged).
+  REAL RUNS 1-2 (frozen-archive config, 2026-07-23): KILL CRITERION
+     FIRED — learned ~= random ~= s2 on far recall (~17%) at both
+     signal mixes; smoking gun = randgaze invariance (learned model
+     scores identically with a random buffer: the reader never used
+     the buffer). S2 gaze aimed 3x better (0.35 vs 0.11) with zero
+     recall payoff. Dense twin: 86.6 h1_far / 68.5 held-out para /
+     38.3 h2_far — full attention + trainable representations
+     ignite lookup easily; core arms still win story ppl (7.14 vs
+     7.30). Diagnosis: frozen off-task archive states are not
+     retrievably decodable + whisper gradient. => v3 unified stack
+     (this version): archive = own windowed lower layers, trained.
   20k-cloud GATE RESOLUTION: oracle PLATEAUS at 74.7 (74.2@8k) =
      the TOY'S information ceiling, not the circuit's — the toy
      archive is a RANDOM encoder; some name->val hashes are not
@@ -149,23 +163,30 @@ class RCoreLM(nn.Module):
     """policy: learned | random | oracle. use_core=False + full_attn
     => the dense twin; use_core=False + window => nocore floor.
 
-    v2 (Ibanis mid-build correction): the core is a FILTER, not a
-    store. The working memory the decoder sees is the K selected
-    archive tokens THEMSELVES (selection over superposition — the
-    vision-era law; slots lose). The filter's only persistent state
-    is n_q query vectors ("what to look for"), updated each boundary
-    from the current buffer; that state never reaches the decoder —
-    selection is its sole means of expression. Accumulation lives in
-    the archive (nothing is lost by eviction), so full reselection
-    per boundary is safe: gaze."""
+    v3 (Ibanis, unified stack): ONE decoder-only model. The first
+    low_layers are the archive-builders — SLIDING-WINDOW attention
+    only (full attention there would smuggle long-range info up the
+    residual stream past the core; globality law). The sparsity
+    core sits in the middle: the gaze selects K lower-stack token
+    states from the whole past at each chunk boundary. The upper
+    layers attend [window || buffer] via cross-reads. Dense twin =
+    the SAME stack, full attention, no core — exact param match.
+    Archive states train end to end; long-range gradient reaches
+    the lower stack ONLY through being selected.
 
-    def __init__(self, vocab, d=256, layers=6, heads=8, max_t=2048,
-                 window=64, chunk=64, k_buf=48, n_query=8,
-                 enc_dim=256, policy="learned", use_core=True,
+    v2 (kept): the core is a FILTER, not a store — the buffer IS
+    the K selected token states (selection over superposition); the
+    filter's persistent state is n_q query vectors updated from
+    what it gathered, expressible only through selection."""
+
+    def __init__(self, vocab, d=256, layers=8, low_layers=3,
+                 heads=8, max_t=2048, window=64, chunk=64, k_buf=48,
+                 n_query=8, policy="learned", use_core=True,
                  full_attn=False, cross_at=None, s_rounds=1):
         super().__init__()
         assert policy in ("learned", "random", "oracle")
         assert max_t % chunk == 0
+        assert 0 < low_layers < layers
         assert window >= chunk - 1 or full_attn or not use_core
         self.d, self.W, self.C = d, window, chunk
         self.K, self.n_query = k_buf, n_query
@@ -180,19 +201,22 @@ class RCoreLM(nn.Module):
         self.emb = nn.Embedding(vocab, d)
         nn.init.normal_(self.emb.weight, std=0.02)
         self.pos = nn.Parameter(torch.randn(1, max_t, d) * 0.02)
-        self.blocks = nn.ModuleList(Block(d, heads)
-                                    for _ in range(layers))
+        self.low = nn.ModuleList(Block(d, heads)
+                                 for _ in range(low_layers))
+        self.high = nn.ModuleList(Block(d, heads)
+                                  for _ in range(layers - low_layers))
         self.norm = nn.LayerNorm(d)
         self.head = nn.Linear(d, vocab, bias=False)
         self.head.weight = self.emb.weight
         self.scale = 1.0 / math.sqrt(d)
         self._masks = {}
         if use_core:
+            n_high = layers - low_layers
             self.cross_at = tuple(cross_at) if cross_at \
-                else (2, layers - 1)
-            self.enc_proj = nn.Linear(enc_dim, d)
-            self.key_ln = nn.LayerNorm(enc_dim)
-            self.key_proj = nn.Linear(enc_dim, d)   # per-token, no mixing
+                else (1, n_high - 1)
+            self.enc_proj = nn.Linear(d, d)
+            self.key_ln = nn.LayerNorm(d)
+            self.key_proj = nn.Linear(d, d)     # per-token, no mixing
             # softplus(0.5413) = 1.0 — learnable sampling temperature
             self.raw_tau = nn.Parameter(torch.tensor(0.5413))
             # the filter's state: learned queries + buffer-conditioned
@@ -288,20 +312,22 @@ class RCoreLM(nn.Module):
                 admits.append(idx.detach().cpu())
         return torch.stack(bufs, dim=1), admits
 
-    def forward(self, toks, enc_h=None, oracle_bias=None,
+    def forward(self, toks, oracle_bias=None,
                 collect=False, gaze_override=None):
         B, T = toks.shape
         x = self.emb(toks) + self.pos[:, :T]
         mask = self._mask(T, toks.device)
+        for blk in self.low:
+            x = blk(x, mask)          # archive-builder (windowed)
         cores = None
         admits = []
         if self.use_core:
             assert T % self.C == 0
             nch = T // self.C
             cores, admits = self.core_pass(
-                enc_h, oracle_bias, collect, gaze_override)
+                x, oracle_bias, collect, gaze_override)
         ci = 0
-        for li, blk in enumerate(self.blocks):
+        for li, blk in enumerate(self.high):
             x = blk(x, mask)
             if self.use_core and li in self.cross_at:
                 xc = x.reshape(B * nch, self.C, self.d)
@@ -310,42 +336,6 @@ class RCoreLM(nn.Module):
                 ci += 1
         logits = self.head(self.norm(x))
         return logits, admits
-
-
-class FrozenEnc(nn.Module):
-    """Toy archive: a small RANDOM frozen causal transformer with a
-    LOCAL attention window. Circuit validation needs an archive
-    interface, not good features — but the window matters: a random
-    GLOBAL encoder spreads attention ~uniformly over the whole past,
-    so a fact token's state barely contains its own fact (~1/250
-    dilution — v0 gate failure: even oracle stayed at chance). A
-    trained encoder concentrates on local context; window=4 gives
-    the toy that property honestly."""
-
-    def __init__(self, vocab, d=64, layers=2, heads=4, max_t=512,
-                 seed=7, window=4):
-        super().__init__()
-        g = torch.Generator().manual_seed(seed)
-        self.emb = nn.Embedding(vocab, d)
-        with torch.no_grad():
-            self.emb.weight.copy_(
-                torch.randn(vocab, d, generator=g) * 0.05)
-        self.pos = nn.Parameter(
-            torch.randn(1, max_t, d, generator=g) * 0.02)
-        self.blocks = nn.ModuleList(Block(d, heads)
-                                    for _ in range(layers))
-        i = torch.arange(max_t)
-        keep = (i.unsqueeze(0) <= i.unsqueeze(1)) \
-            & (i.unsqueeze(0) >= i.unsqueeze(1) - window)
-        self.register_buffer("mask", ~keep)
-        self.requires_grad_(False)
-
-    def forward(self, toks):
-        B, T = toks.shape
-        x = self.emb(toks) + self.pos[:, :T]
-        for b in self.blocks:
-            x = b(x, self.mask[:T, :T])
-        return x
 
 
 # ---------------------------------------------------------------------------
@@ -390,23 +380,22 @@ def build_toy_batch(B, rng, device, n_fact=5, n_q=3):
 
 
 def toy_model(arm, device, seed=0):
-    # k_buf=16 >= the 15 fact tokens: oracle's ceiling stays ~100
+    # k_buf=16 >= the 15 fact tokens: oracle's ceiling stays ~100.
+    # Unified stack: 1 archive layer + 2 upper (reach 3*W unchanged)
     torch.manual_seed(seed)
-    return RCoreLM(V_TOY, d=64, layers=3, heads=4, max_t=T_TOY,
-                   window=W_TOY, chunk=C_TOY, k_buf=16, n_query=4,
-                   enc_dim=64,
+    return RCoreLM(V_TOY, d=64, layers=3, low_layers=1, heads=4,
+                   max_t=T_TOY, window=W_TOY, chunk=C_TOY, k_buf=16,
+                   n_query=4,
                    policy={"oracle": "oracle", "random": "random"}
                    .get(arm, "learned"),
                    use_core=(arm != "nocore"),
-                   cross_at=(1, 2)).to(device)
+                   cross_at=(0, 1)).to(device)
 
 
-def toy_step(model, enc, batch, boost=8.0):
+def toy_step(model, batch, boost=8.0):
     toks, fact_mask, ans_tgt, queries, ob = batch
     inp, tgt = toks[:, :-1], toks[:, 1:]
-    with torch.no_grad():
-        enc_h = enc(inp) if model.use_core else None
-    logits, admits = model(inp, enc_h, oracle_bias=ob)
+    logits, admits = model(inp, oracle_bias=ob)
     ce = F.cross_entropy(logits.reshape(-1, logits.shape[-1]),
                          tgt.reshape(-1), reduction="none")
     w = 1.0 + boost * ans_tgt.reshape(-1).float()
@@ -415,7 +404,7 @@ def toy_step(model, enc, batch, boost=8.0):
 
 
 @torch.no_grad()
-def toy_eval(model, enc, rng, device, batches=8, B=64, collect=False):
+def toy_eval(model, rng, device, batches=8, B=64, collect=False):
     model.eval()
     hits = tot = 0
     gaze_num = gaze_den = 0.0
@@ -423,8 +412,7 @@ def toy_eval(model, enc, rng, device, batches=8, B=64, collect=False):
         batch = build_toy_batch(B, rng, device)
         toks, fact_mask, _, queries, ob = batch
         inp = toks[:, :-1]
-        enc_h = enc(inp) if model.use_core else None
-        logits, admits = model(inp, enc_h, oracle_bias=ob,
+        logits, admits = model(inp, oracle_bias=ob,
                                collect=collect)
         pred = logits.argmax(-1)
         for b, p in queries:
@@ -442,7 +430,6 @@ def toy_eval(model, enc, rng, device, batches=8, B=64, collect=False):
 
 def toy_leak_tests(device):
     """All on a random-init learned model, CPU-tolerant."""
-    enc = FrozenEnc(V_TOY, max_t=T_TOY).to(device)
     model = toy_model("learned", device)
     rng = random.Random(0)
     batch = build_toy_batch(4, rng, device)
@@ -455,17 +442,18 @@ def toy_leak_tests(device):
     def run(x):
         torch.manual_seed(123)          # freeze the gumbel draw
         with torch.no_grad():
-            return model(x, enc(x), oracle_bias=ob)[0]
+            return model(x, oracle_bias=ob)[0]
     l1, l2 = run(inp), run(inp2)
     causal = (l1[:, :p] - l2[:, :p]).abs().max().item()
     ok_causal = causal < 1e-4
 
     # window leak: gaze off (buffer = constant learned bank) =>
-    # positions beyond the STACKED window reach (layers*W) must
-    # not move — the decoder provably cannot reach the cache
+    # positions beyond the STACKED window reach (all layers * W)
+    # must not move — the upper stack provably cannot reach the
+    # cache, and the lower stack is windowed by construction
     model.gaze_on = False
     p2 = 40
-    reach = len(model.blocks) * W_TOY
+    reach = (len(model.low) + len(model.high)) * W_TOY
     inp3 = inp.clone()
     inp3[:, p2] = (inp3[:, p2] + 1) % 249 + 1
     l3, l4 = run(inp), run(inp3)
@@ -475,7 +463,7 @@ def toy_leak_tests(device):
     model.gaze_on = True
 
     # grad flow to the scorer
-    loss, _, _ = toy_step(model, enc, batch)
+    loss, _, _ = toy_step(model, batch)
     loss.backward()
     gq = model.query0.grad.abs().sum().item()
     gk = model.key_proj.weight.grad.abs().sum().item()
@@ -495,7 +483,6 @@ def toy_main(args):
     print(f"TOY GATE device={device}")
     leaks_ok = toy_leak_tests(device)
 
-    enc = FrozenEnc(V_TOY, max_t=T_TOY).to(device)
     arms = args.toy_arms.split(",")
     res, gaze = {}, {}
     for arm in arms:
@@ -506,19 +493,19 @@ def toy_main(args):
         t0 = time.time()
         for step in range(1, args.toy_steps + 1):
             batch = build_toy_batch(32, rng, device)
-            loss, _, _ = toy_step(model, enc, batch)
+            loss, _, _ = toy_step(model, batch)
             opt.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             if step % 100 == 0 or step == 1:
-                acc, _ = toy_eval(model, enc, random.Random(99),
+                acc, _ = toy_eval(model, random.Random(99),
                                   device, batches=2)
                 tau = model.tau_val if model.use_core else 0.0
                 print(f"[{arm:7s}] step {step:4d} loss {loss:.3f} "
                       f"qacc {acc:5.1f} tau {tau:.2f} "
                       f"({time.time() - t0:.0f}s)", flush=True)
-        acc, gz = toy_eval(model, enc, random.Random(1234), device,
+        acc, gz = toy_eval(model, random.Random(1234), device,
                            batches=8, collect=True)
         res[arm], gaze[arm] = acc, gz
     print("\nTOY VERDICT (query acc %, chance 4.0):")
@@ -700,27 +687,9 @@ def gaze_stats(admits, fact_mask, n_fact_rows, chunk):
     return num / max(den, 1e-9), rec / max(len(admits), 1e-9)
 
 
-def enc_forward(enc, inp, device, train_enc=False):
-    """train_enc: archive states join the graph — the encoder learns
-    to encode what the gaze finds worth selecting (gradient reaches
-    it ONLY through selected tokens + scorer keys; the free-decoder
-    law is untouched)."""
-    ctx = torch.enable_grad() if train_enc else torch.no_grad()
-    with ctx, torch.autocast(
-            device_type="cuda", dtype=torch.bfloat16,
-            enabled=(device == "cuda")):
-        h = enc(inp).last_hidden_state.float()
-    return h if train_enc else h.detach()
-
-
-def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
-    train_enc = args.train_enc and model.use_core
-    groups = [{"params": model.parameters(), "lr": args.lr}]
-    if train_enc:
-        enc.train()
-        groups.append({"params": enc.parameters(),
-                       "lr": args.enc_lr})
-    opt = torch.optim.AdamW(groups, weight_decay=0.01)
+def train_real_arm(model, SW, pool, args, arm, device, log_fn):
+    opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
+                            weight_decay=0.01)
     sched = torch.optim.lr_scheduler.LambdaLR(
         opt, lambda s: min(1.0, (s + 1) / max(args.warmup, 1)))
     model.train()
@@ -737,12 +706,10 @@ def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
             far_gap=far_gap)
         inp, tgt = toks[:, :-1], toks[:, 1:]
         collect = (step % args.log_every == 0)
-        enc_h = enc_forward(enc, inp, device, train_enc) \
-            if model.use_core else None
         with torch.autocast(device_type="cuda",
                             dtype=torch.bfloat16,
                             enabled=(device == "cuda")):
-            logits, admits = model(inp, enc_h, collect=collect)
+            logits, admits = model(inp, collect=collect)
             ce = F.cross_entropy(
                 logits.reshape(-1, logits.shape[-1]).float(),
                 tgt.reshape(-1), reduction="none")
@@ -751,8 +718,6 @@ def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
         opt.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        if train_enc:
-            nn.utils.clip_grad_norm_(enc.parameters(), 1.0)
         opt.step()
         sched.step()
         if collect or step == 1:
@@ -774,7 +739,7 @@ def train_real_arm(model, enc, SW, pool, args, arm, device, log_fn):
 
 
 @torch.no_grad()
-def eval_real(model, enc, SW, pool_val, pool_train, args, device,
+def eval_real(model, SW, pool_val, pool_train, args, device,
               gaze_override=None):
     model.eval()
     out = {}
@@ -785,13 +750,10 @@ def eval_real(model, enc, SW, pool_val, pool_train, args, device,
         toks, _, _, _ = build_real_batch(
             SW, args.batch, args.t, rng, pool_val, 0.0, device)
         inp, tgt = toks[:, :-1], toks[:, 1:]
-        enc_h = enc_forward(enc, inp, device) if model.use_core \
-            else None
         with torch.autocast(device_type="cuda",
                             dtype=torch.bfloat16,
                             enabled=(device == "cuda")):
-            logits, _ = model(inp, enc_h,
-                              gaze_override=gaze_override)
+            logits, _ = model(inp, gaze_override=gaze_override)
         ce = F.cross_entropy(
             logits.reshape(-1, logits.shape[-1]).float(),
             tgt.reshape(-1))
@@ -813,13 +775,11 @@ def eval_real(model, enc, SW, pool_val, pool_train, args, device,
                 stmts=args.stmts, filler_frac=args.filler_frac,
                 all_fact=True, far_gap=far_gap)
             inp = toks[:, :-1]
-            enc_h = enc_forward(enc, inp, device) \
-                if model.use_core else None
             with torch.autocast(device_type="cuda",
                                 dtype=torch.bfloat16,
                                 enabled=(device == "cuda")):
                 logits, admits = model(
-                    inp, enc_h, collect=True,
+                    inp, collect=True,
                     gaze_override=gaze_override)
             g = grade(logits, toks, qs)
             for k in agg:
@@ -860,12 +820,6 @@ def real_main(args):
     pool_val = build_story_pool(args.val_pool_tokens, "validation",
                                 "stories_val.npy")
 
-    from transformers import AutoModel
-    enc = AutoModel.from_pretrained(args.enc_name).to(device).eval()
-    enc.requires_grad_(False)
-    enc_dim = enc.config.hidden_size
-    print(f"encoder {args.enc_name} d={enc_dim} frozen", flush=True)
-
     run = None
     if args.wandb:
         import wandb
@@ -891,33 +845,28 @@ def real_main(args):
     models, results = {}, {}
     for arm in args.arms.split(","):
         arm = arm.strip()
-        if args.train_enc and models:      # fresh archive per arm —
-            enc = AutoModel.from_pretrained(  # no cross-arm leakage
-                args.enc_name).to(device).eval()
-            enc.requires_grad_(False)
-        if args.train_enc:
-            enc.requires_grad_(True)
         torch.manual_seed(args.seed)
         model = RCoreLM(50257, d=args.d, layers=args.layers,
+                        low_layers=args.low_layers,
                         heads=args.heads, max_t=args.t,
                         window=args.w, chunk=args.c, k_buf=args.k,
-                        n_query=args.n_query, enc_dim=enc_dim,
+                        n_query=args.n_query,
                         **arm_cfg[arm]).to(device)
         n_par = sum(p.numel() for p in model.parameters())
         print(f"\n=== arm {arm}: {n_par/1e6:.1f}M trainable params",
               flush=True)
-        train_real_arm(model, enc, SW, pool, args, arm, device,
-                       log_fn)
+        train_real_arm(model, SW, pool, args, arm, device, log_fn)
         models[arm] = model
         if args.save_prefix:
             torch.save(model.state_dict(),
                        f"{args.save_prefix}_{arm}.pt")
-        results[arm] = eval_real(model, enc, SW, pool_val, pool,
+        results[arm] = eval_real(model, SW, pool_val, pool,
                                  args, device)
-    if "learned" in models:
-        results["learned-randgaze"] = eval_real(
-            models["learned"], enc, SW, pool_val, pool, args,
-            device, gaze_override="random")
+    for a in list(models):
+        if a.startswith("learned"):
+            results[f"{a}-randgaze"] = eval_real(
+                models[a], SW, pool_val, pool, args,
+                device, gaze_override="random")
 
     print("\n=== RCORE RUNG-1 RESULTS")
     names = list(results)
@@ -967,7 +916,8 @@ def main():
     ap.add_argument("--k", type=int, default=48)
     ap.add_argument("--n-query", type=int, default=8)
     ap.add_argument("--d", type=int, default=256)
-    ap.add_argument("--layers", type=int, default=6)
+    ap.add_argument("--layers", type=int, default=8)
+    ap.add_argument("--low-layers", type=int, default=3)
     ap.add_argument("--heads", type=int, default=8)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--warmup", type=int, default=300)
@@ -984,10 +934,6 @@ def main():
     ap.add_argument("--pool-tokens", type=int, default=120_000_000)
     ap.add_argument("--val-pool-tokens", type=int,
                     default=2_000_000)
-    ap.add_argument("--enc-name", type=str,
-                    default="roneneldan/TinyStories-8M")
-    ap.add_argument("--train-enc", action="store_true")
-    ap.add_argument("--enc-lr", type=float, default=1e-4)
     ap.add_argument("--arms", type=str,
                     default="learned,random,dense")
     ap.add_argument("--eval-story-batches", type=int, default=8)
