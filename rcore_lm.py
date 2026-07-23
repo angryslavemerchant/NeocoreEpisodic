@@ -422,7 +422,8 @@ def toy_model(arm, device, seed=0):
     return RCoreLM(V_TOY, d=64, layers=4, low_layers=1, heads=4,
                    max_t=T_TOY, window=W_TOY, chunk=C_TOY, k_buf=16,
                    n_query=4, w_low=8,
-                   policy={"oracle": "oracle", "random": "random"}
+                   policy={"oracle": "oracle", "random": "random",
+                           "ofrozen": "oracle"}
                    .get(arm, "learned"),
                    use_core=(arm != "nocore"),
                    cross_at=(1, 2)).to(device)
@@ -523,6 +524,11 @@ def toy_main(args):
     res, gaze = {}, {}
     for arm in arms:
         model = toy_model(arm, device, seed=args.seed)
+        if arm == "ofrozen":
+            # bisect probe: oracle gaze over a lower layer FROZEN at
+            # random init — plumbing test with v2-like archive
+            for p_ in model.low.parameters():
+                p_.requires_grad = False
         opt = torch.optim.AdamW(model.parameters(), lr=1e-3,
                                 weight_decay=0.01)
         rng = random.Random(args.seed + 1)
