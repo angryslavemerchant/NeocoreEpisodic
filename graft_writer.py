@@ -180,7 +180,7 @@ def run_batch_writer(model, batch, K, device, arm, aux_w,
     slots = torch.zeros(B, n_facts, dtype=torch.long, device=device)
     loss = torch.zeros((), device=device)
     nq = 0
-    stats = {k: [0.0, 0] for k in ("h1", "h2", "abstain")}
+    stats = {k: [0.0, 0] for k in ("h1", "h2", "h3", "abstain")}
     lm_sum, lm_n = 0.0, 0
     for c0 in range(0, D, CHUNK):
         chunk_loss = torch.zeros((), device=device)
@@ -218,7 +218,8 @@ def run_batch_writer(model, batch, K, device, arm, aux_w,
                 any_q = True
                 hit = float(doc_ok[b, j])
                 key = ("abstain" if k == "q_abstain"
-                       else ("h1" if k == "q_h1" else "h2"))
+                       else ("h1" if k == "q_h1"
+                             else ("h3" if k == "q_h3" else "h2")))
                 stats[key][0] += hit
                 stats[key][1] += 1
             if any_q:
