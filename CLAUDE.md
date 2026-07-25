@@ -899,12 +899,60 @@ Readings:
    hard-regime arrivals (stream-q at 1400, abstain at 2400) with no
    ignition wobble — curricula + learned writer are compatible.
 
-NEXT (memory line, primary): interleaved/multi-stream lifetimes;
-long-context and LoRA-per-stream competitor arms to complete the
-five-arm table; learned-theta (write-score head) to close the
-fixed-threshold wart; then the looped-transformer + book direction
-(Ibanis 2026-07-25: reasoning loop over the writable store —
-SimpleCore's core reborn around a memory that gives the loop a job).
+## PROSE + LoRA RESULTS (2026-07-25 same-day; graft_writer.py
+## --world prose / --lora 16; wandb graftw-s3000-2508 (z4c1ty0h) +
+## graftw-s4000-2854 (o6w713u4), verified artifacts; ~$4 total)
+
+Infra first (Ibanis asked "can we speed it up"): graft line trained
+FP32 all along — bf16 autocast + torch.compile(GPT-2 blocks) =
+3.4x (5.0 -> 1.47 s/step at L_DOC 56). --compile is standing. Both
+applied by IN-PLACE remote restart (ssh, git pull, tmux) at Ibanis's
+direction — no destroys. Ops: after an in-place restart, launch.py
+logs shows the DEAD wrapper's stream (monitor must ssh-tail
+train.log); self-destroy wrapper detaches (manual destroy after
+artifact check); bf16 exposed a dtype bug (fp32 finfo.min sentinel
+overflows bf16 in Book.write — economy now forced fp32); Vast now
+shows an AI-agent-targeted ssh banner fleet-wide (untrusted; ignore).
+
+LoRA r16 (bank world, GPT-2 100% FROZEN; 2.36M adapters + 4.7M
+heads = ~5%):
+    livew 89.5/96.4 (full-FT: 92.5/96.7 — h2 EQUAL, h1 -3)
+    theta0.9 no-flags 85.7/85.7 (full-FT: 91.5/93.4)
+    holdout 73.1/81.2; write-all == fact-gated theta everywhere.
+PORTABILITY CONFIRMED: the graft is "any LLM + a LoRA pass"; the
+read/write circuit does not need deep weight changes.
+
+PROSE world (narratives + pronoun coref + entity-distractor
+fillers; full FT):
+    livew 86.8/26.1 | holdout-narrative 29.3/19.6 | @60% fill
+    85.3/29.7 | theta0.9 59.1/20.7 | write-all0.9 58.9/21.2
+    (== gated within noise) | frozen 0.1/3.8
+Readings:
+1. Single-fact memory SURVIVES prose (h1 86.8); composition
+   CRASHES (h2 96.7 -> 26.1). Mechanism (analysis w/ Ibanis): hop-1
+   queries come from clean question text; hop-2 queries are built
+   FROM the retrieved payload — IDF-pooling 56 narrative tokens
+   smears the bridge entity, and chained matching compounds noise
+   multiplicatively. h1 degrades linearly, h2 collapses.
+2. The write-all gate HELD: entity-chatter hard negatives did not
+   poison the book (write-all == fact-gated at every theta). The
+   learned key space separates fact-shaped from chatter-shaped
+   prose without any what-to-write supervision.
+3. Remaining prose gaps all point at the PERCEPT: held-out
+   narrative structures 29.3 (payload/key rendering overfits
+   trained narrative shapes; lm_loss 4.71 on hold split), autonomy
+   59 vs bank 86. Pooling is the prime suspect in all three.
+NEXT BUILD (agreed with Ibanis, spec'd in conversation): the
+CONTINUOUS SELECT-WRITER (graft_cwriter.py) — select-not-pool
+percepts (single chosen token state, not doc average; the vision
+selection law reborn in the writer), sliding-window candidacy (no
+doc boundaries), budgeted top-M write attempts per chunk (economy
+cost stays flat), novelty-gated, NO fact flags even in training —
+the last big wheel off. Grades: prose h2 (payload smear), holdout
+narratives, theta gap. Then: oracle-bridge eval to decompose
+h2 (payload noise vs pipeline limit); loop direction waits on that.
+Also still queued: long-context + LoRA-per-stream competitor arms;
+real-corpus LM-only streams (perplexity-rent self-supervision).
 
 STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
 at v8): the symbolic line's next build if the program returns there.
