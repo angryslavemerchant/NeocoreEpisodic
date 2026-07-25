@@ -954,6 +954,45 @@ h2 (payload noise vs pipeline limit); loop direction waits on that.
 Also still queued: long-context + LoRA-per-stream competitor arms;
 real-corpus LM-only streams (perplexity-rent self-supervision).
 
+## LOOPED READER — SIDE LADDER (2026-07-25 night; graft_loop.py;
+## 2 runs ~$3, wandb graftloop-* xe539gm7 + c4ot1p1g, verified)
+
+Architecture: fixed ReadHeads replaced by [tied read -> shared
+block(warm from blk6)] x S after block 5; depth = runtime dial.
+3-hop questions (partner->employer->industry/city, kind q_h3) exist
+ONLY at eval — composer-v4 protocol, neural edition. Bank world
+(store proven clean there).
+
+    arm            h1     h2     h3@S3/4/5
+    fixed S=3    91.2   97.1    12.3/13.1/13.5  (+ h1/h2 decay at S>3)
+    var S~U(2,5) 88.4   31.6     9.8/10.7/10.0  (h1 S-invariant!)
+    (3-hop guessing floor ~8-12; fixed-pipeline reference 92.5/96.7)
+
+Verdicts:
+1. Loop at parity with fixed pipeline at trained depth (91/97);
+   autonomy survives (theta0.9 90.3/88.5). Iteration syntax is free.
+2. Fixed-S: NO depth generalization — h3 at floor, extra loops
+   degrade trained skills. The loop unrolled into rigid 3-stage
+   roles: the AR arm of composer-v4, neural edition (6th sighting
+   of who-owns-the-iteration).
+3. Variable-S: h2 NEVER FORMS (31.6) while h1 becomes genuinely
+   S-invariant. DRIFT LAW, TEMPORAL EDITION (7th sighting): the
+   payload->query circuit cannot form when its position within the
+   loop is never twice the same. Bracket complete: stability forms
+   circuits that don't generalize; variability generalizes circuits
+   that can't form.
+4. Prescribed next arm (parked): S-curriculum — fixed S=3 until
+   2-hop ignition (~2k steps), THEN anneal in S~U(2,5). Terminal
+   fallback: neural walker (explicit owned hop-cursor). Ladder
+   BANKED here; falling-line rung takes priority (Ibanis concurred:
+   hop-productivity is the composer program's question, not the
+   memory north star's).
+
+Also: 2-hop is the DEGENERATE recursion case — hop1 is text->query,
+hop2 is payload->query, each ONCE per example; the repeatable unit
+never repeats in <=2-hop training. Train-3-eval-4 is the honest
+productivity split if the ladder resumes.
+
 STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
 at v8): the symbolic line's next build if the program returns there.
 
