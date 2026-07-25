@@ -852,11 +852,59 @@ Readings:
    graft_gpt2.py (fix like simplecore's time suffix before next
    multi-instance campaign).
 
-NEXT (memory line, now primary): learned writer head on hidden
-states (keys/payloads from the LM, novelty-gated timing) targeting
-the holdout-paraphrase gap; then interleaved/multi-stream lifetimes;
+## LEARNED WRITER RESULT (2026-07-25 same-day; graft_writer.py,
+## wandb neocore-stream graftw-s4000-88061 run jgwhafbs, verified
+## artifact; 1 PRO 6000, ~3.4 h, ~$4)
+
+Design (per-chunk-backward-compatible gradient path): book slots
+store running-mean PERCEPTS (IDF-pooled block-5 hidden states,
+detached); two 2-layer MLP heads (4.7M params, ~3.6%) re-transform
+stored percepts into keys/payloads FRESH inside every chunk's graph
+— writer gradients arrive chunk-locally from LM/answer/aux losses,
+store stays non-differentiable, per-chunk backward stays exact.
+Writes post-forward (CHUNK 16 < MIN_GAP 25). Meta-train files by
+flags; the autonomy grade is eval-only novelty-rule filing in the
+LEARNED key space (theta sweep).
+
+    arm (exact %)          h1      h2    abst   used   [recipe was]
+    livew (flag-timed)   92.5    96.7    97.1   55.0   [63.0/33.0]
+    holdout paraphrase   80.7    86.9    98.3   55.0   [23.8/25.3]
+    @60% fillers         93.2    95.8    98.5   55.0   [63.0/30.5]
+    THETA 0.9 (no flags) 91.5    93.4    98.3   95.9   [ 0.0/ 0.0]
+    theta 0.75           75.8    70.2    99.2   79.4
+    theta 0.6            52.1    35.9    98.3   41.0
+    frozen (junk book)    1.5     6.3     —      —     [ 1.4/ 6.9]
+
+Readings:
+1. AUTONOMY PASSED: novelty-rule filing in the learned key space,
+   zero harness flags, lands within ~3 pts of cheat-flagged filing
+   (91.5/93.4 vs 92.5/96.7). The model decides what to write, writes
+   its own learned content, zero gradients at deployment. The full
+   claim now has no hand-fed-writes asterisk.
+2. THE WRITER WAS THE BOTTLENECK: 63/33 -> 92.5/96.7 purely from
+   content (wte doc-mean -> learned transforms of hidden states).
+   Two-hop essentially solved (33 -> 96.7): learned payloads carry
+   the bridging entity in directly-usable form. At matched step 850
+   the learned writer already beat the recipe's final ceiling
+   (0.82/0.91 vs 0.41/0.27 same-step, 0.62/0.28 final).
+3. Paraphrase wart FIXED: holdout 24/25 -> 81/87 — hidden-state
+   keys generalize phrasing where bag-of-embedding keys could not.
+4. Theta dial = the grain laws in a fourth domain: 0.6 under-births
+   (41 slots, collisions, permanent — 52/36); 0.9 over-births (96
+   slots/55 facts, dilution the soft read recovers — 91/93). Err
+   toward birthing, again. Fixed-theta-in-learned-space wart stands
+   (0.9 calibrated post hoc by sweep).
+5. Controls hold: frozen craters; abstention ~98 correct alongside
+   90+ answering (no degenerate basin); training rode THROUGH the
+   hard-regime arrivals (stream-q at 1400, abstain at 2400) with no
+   ignition wobble — curricula + learned writer are compatible.
+
+NEXT (memory line, primary): interleaved/multi-stream lifetimes;
 long-context and LoRA-per-stream competitor arms to complete the
-five-arm table.
+five-arm table; learned-theta (write-score head) to close the
+fixed-threshold wart; then the looped-transformer + book direction
+(Ibanis 2026-07-25: reasoning loop over the writable store —
+SimpleCore's core reborn around a memory that gives the loop a job).
 
 STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
 at v8): the symbolic line's next build if the program returns there.
