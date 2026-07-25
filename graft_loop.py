@@ -37,6 +37,7 @@ import torch.nn as nn
 
 import stream_text_v2 as W
 from stream_text_v2 import CHUNK, Q1, Q2, N_C
+import graft_writer as GW
 from graft_writer import (GraftWriterLM, WriterView, run_batch_writer,
                           train_writer, eval_writer, _bf16_ok, _IdMap)
 from graft_gpt2 import GraftLM  # noqa: F401  (import chain)
@@ -88,9 +89,15 @@ def install_q3():
 
 
 class GraftLoopLM(GraftWriterLM):
-    def __init__(self, K=96, s_loops=3, name="gpt2"):
+    def __init__(self, K=96, s_loops=3, name="gpt2", s_range=None):
         super().__init__(K=K, name=name, read_depths=(5, 11))
         self.s_loops = s_loops
+        # variable-S training: sample the loop count per FORWARD
+        # (per chunk) so no iteration can specialize into a fixed
+        # role — the anti-unrolling pressure (composer-v4 verdict:
+        # the S=3-fixed loop learned a 3-stage circuit, h3 at floor)
+        self.s_range = s_range
+        self._srng = random.Random(777)
         # shared loop block: architecture clone of a GPT-2 block,
         # warm-started from block 6 (easy gradients at hookup)
         self.loop_block = copy.deepcopy(self.tr.h[6])
@@ -102,6 +109,8 @@ class GraftLoopLM(GraftWriterLM):
         return ps  # loop_block joins the BASE lr group
 
     def forward_docs_writer(self, toks, book):
+        if self.training and self.s_range is not None:
+            self.s_loops = self._srng.randint(*self.s_range)
         B, N, L = toks.shape
         pos = torch.arange(L, device=toks.device)
         x = self.tr.wte(toks.reshape(B * N, L)) + self.tr.wpe(pos)
@@ -144,6 +153,10 @@ def main():
     ap.add_argument("--batch", type=int, default=24)
     ap.add_argument("--k", type=int, default=96)
     ap.add_argument("--s", type=int, default=3)
+    ap.add_argument("--s-min", type=int, default=0,
+                    help="if >0 with --s-max: sample S per chunk "
+                         "during training (anti-unrolling)")
+    ap.add_argument("--s-max", type=int, default=0)
     ap.add_argument("--lr-base", type=float, default=3e-5)
     ap.add_argument("--lr-new", type=float, default=1e-3)
     ap.add_argument("--aux-anneal", type=float, default=0.4)
@@ -179,8 +192,13 @@ def main():
                          config=vars(args))
     log_fn = (lambda x: run.log(x)) if run else None
 
-    model = GraftLoopLM(K=args.k, s_loops=args.s)
+    s_range = ((args.s_min, args.s_max)
+               if args.s_min > 0 and args.s_max >= args.s_min
+               else None)
+    model = GraftLoopLM(K=args.k, s_loops=args.s, s_range=s_range)
     model = model.to(device)
+    if s_range:
+        print(f"variable-S training: S ~ U{s_range}", flush=True)
     if args.compile:
         for bi in range(len(model.tr.h)):
             model.tr.h[bi] = torch.compile(model.tr.h[bi])
