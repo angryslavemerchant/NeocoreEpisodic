@@ -804,9 +804,59 @@ general small LM (10-30M, TinyStories-class corpus) with:
 - S=1 core first; S=2 iff admission-thrash in the maps
 - expect ignition fights: apply the bisect curricula (hard regimes
   arrive after circuit formation), aux-with-anneal available
-Open receipt (parked, low priority): the 124M graft never produced
-its table (3 OOMs -> per-chunk fix landed -> final attempt zombied).
-Memory-line v2.3 gate result stands as that campaign's checkpoint.
+Open receipt CLOSED 2026-07-25 — see the 124M GRAFT RESULT below.
+
+## 124M GRAFT RESULT (2026-07-25 overnight; graft_gpt2.py, wandb
+## neocore-stream runs 76m9ai8d/zgtgo9ns/ucjf467f, verified
+## artifacts; 3 parallel PRO 6000s, ~3 h, ~$10)
+
+Context: after the SimpleCore base-stage closeout, Ibanis called the
+program's premise into question; the session reckoning inverted it —
+MEMORY is the organ, gaze its servant (every real win came from
+rule-written stores/architectural paths; every backprop-learned
+selection failed or tied random). The parked graft was un-parked as
+the cheapest test of the inversion. Local CPU smoke passed first try
+(the per-chunk fix had never actually executed); 3 arms split across
+3 instances.
+
+    arm (exact %)         h1      h2     lm_loss
+    live (writable)     63.0    33.0      0.58
+    live @60% fillers   63.0    30.5      0.43
+    live holdout-para   23.8    25.3      2.36
+    frozen (junk book)   1.4     6.9      3.29
+    dense (GPT-2 FT)     3.4    11.7      1.21
+    metabook (Meta rgm)  3.4    11.7      1.21
+    live-theta           0.0     0.0      7.94
+
+Readings:
+1. THE CLAIM LANDS AT REAL SCALE: pretrained GPT-2 + one rule-written
+   book answers h1/h2 about facts no context window held, 63/33 vs
+   3/12 dense floor. Channel PROVABLY load-bearing: junk book at eval
+   craters recall AND 5x's LM loss — no randgaze-tie ambiguity.
+   "Learning that doesn't end when training does," in a real LM.
+2. METABOOK == DENSE TO 4 DECIMALS: backprop slots frozen at eval
+   store nothing under per-lifetime randomization; both collapse to
+   the same abstain-always basin (identical behavior -> identical
+   scores; dense's abstain=1.0 is degenerate-OPTIMAL for a memoryless
+   model here). This measured row IS the differentiated claim vs
+   Meta's Memory Layers: the WRITE RULE is the value, not the layer.
+3. Warts (both informative): holdout paraphrases 63->24 — harness-
+   slot keys don't transfer phrasing-robustly; the learned writer
+   head (queued ladder rung) is now justified by data, not taste.
+   live-theta ZERO — raw GPT-2 doc-mean geometry doesn't support
+   naive novelty filing (unlike the from-scratch toy, whose meta-
+   training organized the space); the writer must be learned at
+   this scale.
+4. Ops: dead SSH log channel != zombie (live arm trained blind for
+   3 h, wandb heartbeat arbitrated); wandb run names collide in
+   graft_gpt2.py (fix like simplecore's time suffix before next
+   multi-instance campaign).
+
+NEXT (memory line, now primary): learned writer head on hidden
+states (keys/payloads from the LM, novelty-gated timing) targeting
+the holdout-paraphrase gap; then interleaved/multi-stream lifetimes;
+long-context and LoRA-per-stream competitor arms to complete the
+five-arm table.
 
 STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
 at v8): the symbolic line's next build if the program returns there.
