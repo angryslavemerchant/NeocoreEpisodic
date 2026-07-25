@@ -47,6 +47,10 @@ from toy_stream_icl import Book
 from graft_gpt2 import GraftLM, _IdMap
 
 
+def _bf16_ok(device):
+    return device == "cuda" and torch.cuda.is_bf16_supported()
+
+
 class LoRAWrap(nn.Module):
     """Minimal LoRA around a transformers Conv1D (weight (nin, nout),
     forward = x @ W + b). Base frozen by the caller."""
@@ -241,9 +245,14 @@ def run_batch_writer(model, batch, K, device, arm, aux_w,
             loss = loss + chunk_loss.detach()
         else:
             loss = loss + chunk_loss
-        # writes AFTER forward+loss: harvest this chunk's percepts
+        # writes AFTER forward+loss: harvest this chunk's percepts.
+        # autocast OFF: the book's economy runs fp32 (finfo(dtype).min
+        # sentinels in Book.write overflow bf16), and percepts are
+        # cast up so stored means never mix precisions.
         if arm in ("livew", "livew-theta", "livew-all"):
-            with torch.no_grad():
+            with torch.no_grad(), \
+                    torch.autocast(device_type="cuda", enabled=False):
+                percepts = percepts.float()
                 for j in range(c1 - c0):
                     fcol = fids[:, c0 + j]
                     ok = fcol >= 0
@@ -303,8 +312,11 @@ def train_writer(model, steps, B, K, lr_base, lr_new, device,
                             filler_frac=filler_frac, abstain_frac=af,
                             n_stream_q=sq)
         opt.zero_grad()
-        loss, st = run_batch_writer(model, batch, K, device, "livew",
-                                    aux_w, do_backward=True)
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16,
+                            enabled=_bf16_ok(device)):
+            loss, st = run_batch_writer(model, batch, K, device,
+                                        "livew", aux_w,
+                                        do_backward=True)
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
         if step == 1 or step % log_every == 0:
@@ -328,8 +340,10 @@ def eval_writer(model, B, K, device, arm, batches, stmts, filler_frac,
     for _ in range(batches):
         batch = build_batch(B, device, rng, bank_part=bank_part,
                             stmts=stmts, filler_frac=filler_frac)
-        _, st = run_batch_writer(model, batch, K, device, arm, 0.0,
-                                 theta=theta)
+        with torch.autocast(device_type="cuda", dtype=torch.bfloat16,
+                            enabled=_bf16_ok(device)):
+            _, st = run_batch_writer(model, batch, K, device, arm,
+                                     0.0, theta=theta)
         for k, v in st.items():
             agg.setdefault(k, []).append(v)
     return {k: sum(v) / len(v) for k, v in agg.items()}
@@ -348,6 +362,9 @@ def main():
     ap.add_argument("--lora", type=int, default=0,
                     help="LoRA rank; 0 = full fine-tune")
     ap.add_argument("--lr-lora", type=float, default=3e-4)
+    ap.add_argument("--compile", action="store_true",
+                    help="torch.compile the GPT-2 blocks (cloud only;"
+                         " needs triton)")
     ap.add_argument("--stmts", type=int, default=2)
     ap.add_argument("--filler-frac", type=float, default=0.3)
     ap.add_argument("--eval-batch", type=int, default=24)
@@ -390,6 +407,12 @@ def main():
         print(f"LoRA r{args.lora}: {n_lora/1e6:.2f}M adapter params, "
               f"base FROZEN", flush=True)
     model = model.to(device)
+    if args.compile:
+        # compile per-block: chunk shapes vary only in N (docs per
+        # chunk), so variants stay few; heads/reads are tiny, skip
+        for bi in range(len(model.tr.h)):
+            model.tr.h[bi] = torch.compile(model.tr.h[bi])
+        print("torch.compile: 12 GPT-2 blocks compiled", flush=True)
     model._idf = W._IDF.to(device) if W._IDF is not None else None
     n_new = sum(p.numel() for p in model.new_params())
     print(f"writer graft: {n_new/1e6:.1f}M new params", flush=True)
