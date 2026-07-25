@@ -47,6 +47,39 @@ from toy_stream_icl import Book
 from graft_gpt2 import GraftLM, _IdMap
 
 
+class LoRAWrap(nn.Module):
+    """Minimal LoRA around a transformers Conv1D (weight (nin, nout),
+    forward = x @ W + b). Base frozen by the caller."""
+
+    def __init__(self, base, r, alpha=32):
+        super().__init__()
+        self.base = base
+        nin, nout = base.weight.shape
+        self.A = nn.Parameter(torch.randn(nin, r) * 0.01)
+        self.Bm = nn.Parameter(torch.zeros(r, nout))
+        self.scale = alpha / r
+
+    def forward(self, x):
+        return self.base(x) + (x @ self.A @ self.Bm) * self.scale
+
+
+def add_lora(model, r):
+    """Freeze ALL GPT-2 params; wrap attn+mlp projections with LoRA.
+    Read/write heads stay trainable (they are not part of tr)."""
+    for p in model.tr.parameters():
+        p.requires_grad_(False)
+    for p in model.lm_head.parameters():
+        p.requires_grad_(False)
+    lora_ps = []
+    for blk in model.tr.h:
+        for parent, name in ((blk.attn, "c_attn"), (blk.attn, "c_proj"),
+                             (blk.mlp, "c_fc"), (blk.mlp, "c_proj")):
+            wrap = LoRAWrap(getattr(parent, name), r)
+            setattr(parent, name, wrap)
+            lora_ps += [wrap.A, wrap.Bm]
+    return lora_ps
+
+
 class WriterView:
     """Per-chunk differentiable view of the book: transforms stored
     percepts through the writer heads WITH graph. Interface matches
@@ -209,16 +242,19 @@ def run_batch_writer(model, batch, K, device, arm, aux_w,
         else:
             loss = loss + chunk_loss
         # writes AFTER forward+loss: harvest this chunk's percepts
-        if arm in ("livew", "livew-theta"):
+        if arm in ("livew", "livew-theta", "livew-all"):
             with torch.no_grad():
                 for j in range(c1 - c0):
                     fcol = fids[:, c0 + j]
                     ok = fcol >= 0
-                    if not bool(ok.any()):
+                    # livew-all: the gate sees EVERY doc (incl.
+                    # distractor prose) and decides alone — the
+                    # fully-autonomous grade. Others: fact docs only.
+                    if arm != "livew-all" and not bool(ok.any()):
                         continue
                     u = percepts[:, j]
                     kv = F.normalize(model.key_head(u), dim=-1)
-                    if arm == "livew-theta":
+                    if arm in ("livew-theta", "livew-all"):
                         i = book.write(kv, u)
                         slots[ok, fcol[ok]] = i[ok]
                     else:
@@ -244,12 +280,17 @@ def train_writer(model, steps, B, K, lr_base, lr_new, device,
                  aux_anneal, stmts, filler_frac, log_every=50,
                  log_fn=None, abstain_frac=0.12, abstain_warmup=0.6,
                  stream_q_warmup=0.35):
-    new_ids = {id(p) for p in model.new_params()}
-    base = [p for p in model.parameters() if id(p) not in new_ids]
-    opt = torch.optim.AdamW(
-        [{"params": base, "lr": lr_base},
-         {"params": model.new_params(), "lr": lr_new}],
-        weight_decay=0.01)
+    lora_ps = getattr(model, "lora_ps", [])
+    skip = {id(p) for p in model.new_params()} \
+        | {id(p) for p in lora_ps}
+    base = [p for p in model.parameters()
+            if id(p) not in skip and p.requires_grad]
+    groups = [{"params": base, "lr": lr_base},
+              {"params": model.new_params(), "lr": lr_new}]
+    if lora_ps:
+        groups.append({"params": lora_ps,
+                       "lr": getattr(model, "lr_lora", 3e-4)})
+    opt = torch.optim.AdamW(groups, weight_decay=0.01)
     model.train()
     rng = random.Random(1234)
     t0 = time.time()
@@ -302,6 +343,11 @@ def main():
     ap.add_argument("--lr-base", type=float, default=3e-5)
     ap.add_argument("--lr-new", type=float, default=1e-3)
     ap.add_argument("--aux-anneal", type=float, default=0.4)
+    ap.add_argument("--world", type=str, default="bank",
+                    choices=("bank", "prose"))
+    ap.add_argument("--lora", type=int, default=0,
+                    help="LoRA rank; 0 = full fine-tune")
+    ap.add_argument("--lr-lora", type=float, default=3e-4)
     ap.add_argument("--stmts", type=int, default=2)
     ap.add_argument("--filler-frac", type=float, default=0.3)
     ap.add_argument("--eval-batch", type=int, default=24)
@@ -320,8 +366,12 @@ def main():
     W._NVOCAB = 50257
     W.PAD = 50256
     W.UNKNOWN_IDS = W.enc_c(" unknown")
+    if args.world == "prose":
+        import stream_prose
+        stream_prose.setup()
     W.build_idf()
-    print(f"device={device} learned-writer graft", flush=True)
+    print(f"device={device} learned-writer graft "
+          f"world={args.world} lora={args.lora}", flush=True)
 
     run = None
     if args.wandb:
@@ -332,7 +382,14 @@ def main():
                          config=vars(args))
     log_fn = (lambda x: run.log(x)) if run else None
 
-    model = GraftWriterLM(K=args.k).to(device)
+    model = GraftWriterLM(K=args.k)
+    if args.lora > 0:
+        model.lora_ps = add_lora(model, args.lora)
+        model.lr_lora = args.lr_lora
+        n_lora = sum(p.numel() for p in model.lora_ps)
+        print(f"LoRA r{args.lora}: {n_lora/1e6:.2f}M adapter params, "
+              f"base FROZEN", flush=True)
+    model = model.to(device)
     model._idf = W._IDF.to(device) if W._IDF is not None else None
     n_new = sum(p.numel() for p in model.new_params())
     print(f"writer graft: {n_new/1e6:.1f}M new params", flush=True)
@@ -349,6 +406,9 @@ def main():
     for th in (0.6, 0.75, 0.9):
         results[f"theta{th}"] = eval_writer(
             model, args.eval_batch, args.k, device, "livew-theta",
+            args.eval_batches, args.stmts, args.filler_frac, theta=th)
+        results[f"all{th}"] = eval_writer(
+            model, args.eval_batch, args.k, device, "livew-all",
             args.eval_batches, args.stmts, args.filler_frac, theta=th)
     results["holdout"] = eval_writer(
         model, args.eval_batch, args.k, device, "livew",

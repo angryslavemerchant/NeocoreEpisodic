@@ -1,0 +1,182 @@
+{
+  "founded": {
+    "train": [
+      "The story of {C} begins in a rented garage. {P} started the firm with almost nothing, and the early years were lean.",
+      "Few remember how {C} got going. It was {P} who founded it, long before the name meant anything.",
+      "{P} had been turned down by every bank in town. Undeterred, they went ahead and founded {C} anyway.",
+      "At the anniversary dinner, employees toasted {P}. Founding {C} had been their proudest gamble, the speeches said.",
+      "A faded photograph in the lobby shows {P} signing papers. That was the day {C} was founded.",
+      "Ask anyone at headquarters who built the place. The answer is always the same: {C} exists because {P} founded it.",
+      "{C} nearly folded in its first winter. Its founder, {P}, sold a car to make payroll and kept the doors open.",
+      "The trade press once mocked the venture. {P} founded {C} regardless, and the mockery faded within a decade.",
+      "Every desk at {C} carries a small brass plate. It quotes {P}, the company's founder, on the value of patience.",
+      "Legal documents from that spring list one name. {P} is recorded there as the founder of {C}."
+    ],
+    "hold": [
+      "A documentary crew came around last year asking about origins. They left with one clear fact: {P} founded {C}.",
+      "Nobody disputes the founding story anymore. {C} was started by {P}, whatever the old rumors claimed.",
+      "The museum exhibit on local industry keeps a single caption under the display. Founded by {P}, it reads, beside the {C} logo."
+    ]
+  },
+  "industry": {
+    "train": [
+      "Most people guess wrong about {C}. The company actually works in {I}, and has for years.",
+      "{C} rarely advertises. Word of mouth carries far in the {I} business, its managers like to say.",
+      "The quarterly report was dull reading. Still, it confirmed {C} remains committed to the {I} sector.",
+      "Visitors expect something flashier from the headquarters. But {I} is steady work, and {C} has built its name on it.",
+      "A trade magazine profiled {C} in March. The piece called it one of the quieter names in {I}.",
+      "{C} sponsors the harbor festival every summer. It is the company's way of thanking the town that supports its {I} operations.",
+      "New hires at {C} spend a week in orientation. Most of it covers the basics of the {I} trade.",
+      "Competitors watch {C} closely. In {I}, even small moves ripple across the market.",
+      "The sign outside the office says little. Inside, everything at {C} revolves around {I}.",
+      "{C} has changed owners twice. Through it all, the firm never left the {I} business."
+    ],
+    "hold": [
+      "An analyst summed up {C} in one line. A disciplined operator, she wrote, in an unforgiving corner of the {I} market.",
+      "The company picnic ended with the usual toast. To {C}, someone shouted, and to {I}, the trade that feeds us.",
+      "Regulators classify {C} under a single heading. Its filings list {I} as the firm's line of business."
+    ]
+  },
+  "based_in": {
+    "train": [
+      "The morning ferry passes the {C} building every day. The company has been based in {X} since anyone can remember.",
+      "Mail for {C} takes a while to arrive. Its head office sits in {X}, far from the coastal depots.",
+      "{C} looked at three cities before settling. In the end the firm planted its headquarters in {X}.",
+      "Employees joke about the weather at head office. {C} operates out of {X}, and the winters there are famous.",
+      "The annual meeting is never hard to find. {C} holds it in {X}, the city it calls home.",
+      "A courier once drove two days to reach the office. {C} is headquartered in {X}, well off the main routes.",
+      "Local papers in {X} cover the firm closely. {C} is, after all, based right there in town.",
+      "The lease was signed decades ago. {C} has kept its base in {X} ever since.",
+      "Tour groups sometimes stop outside the building. The {X} offices of {C} are something of a landmark now.",
+      "Ask the receptionist where the real decisions happen. She will tell you {C} runs everything from {X}."
+    ],
+    "hold": [
+      "The relocation rumors never came true. {C} stayed put in {X}, to the relief of its staff.",
+      "A new signpost went up by the ring road. It points toward {X}, home of {C}.",
+      "Investors flew in for the site visit. Their itinerary listed one destination: {X}, where {C} keeps its headquarters."
+    ]
+  },
+  "makes": {
+    "train": [
+      "The factory floor hums through the night. {C} produces the {PROD} there, crate after crate.",
+      "Retailers reorder before every holiday. The {PROD} is {C}'s signature product, and it rarely stays on shelves.",
+      "Engineers at {C} guard the design jealously. The {PROD} took years to get right.",
+      "A recall scare came to nothing last year. {C} stood by the {PROD}, and customers stayed loyal.",
+      "The catalog runs to forty pages. Page one, as always, belongs to the {PROD}, the pride of {C}.",
+      "Nobody expected the launch to succeed. Yet the {PROD} became the product {C} is known for.",
+      "{C} runs a single production line at full tilt. Everything on it goes into the {PROD}.",
+      "The trade fair booth drew long queues. People wanted to see the {PROD}, {C}'s flagship, up close.",
+      "Repair shops know the model well. The {PROD} from {C} turns up on their benches every week.",
+      "The marketing is understated. A plain box, the {C} name, and the {PROD} inside."
+    ],
+    "hold": [
+      "Collectors trade early units at a premium. An original {PROD}, stamped with the {C} mark, is hard to find.",
+      "The patent filing tells the story plainly. {C} lists the {PROD} as its principal manufactured good.",
+      "A customer wrote in after twenty years of use. Her {PROD} still worked, she said, a credit to {C}."
+    ]
+  },
+  "works_as": {
+    "train": [
+      "The workshop opens before dawn. {P} has worked as a {J} for most of their life.",
+      "Neighbors know where to go when things go wrong. {P} is the local {J}, and a good one.",
+      "The certificate on the wall is framed in oak. It licenses {P} to practice as a {J}.",
+      "{P} almost chose a different path. Instead they trained as a {J}, and never looked back.",
+      "The union rolls list {P} among their members. Their trade is given as {J}.",
+      "Friends tease {P} about the odd hours. Such is the life of a {J}, {P} says with a shrug.",
+      "At the school career day, {P} drew the biggest crowd. The children had endless questions about being a {J}.",
+      "{P} keeps their tools in immaculate order. A {J} is only as good as their kit, they insist.",
+      "The busy season leaves {P} exhausted. Working as a {J} demands more than people think.",
+      "A stranger once asked {P} what they did. A {J}, came the answer, born and bred."
+    ],
+    "hold": [
+      "The town directory has a short entry for {P}. Occupation: {J}.",
+      "When the storm hit, everyone needed help at once. {P}, the district's {J}, barely slept that week.",
+      "{P} was interviewed for the local paper's trades column. The piece described a {J} at the top of their craft."
+    ]
+  },
+  "lives_in": {
+    "train": [
+      "The commute is the worst part of {P}'s week. Home is {X}, a long way from anywhere.",
+      "{P} moved twice before settling down. These days they live in {X} and have no plans to leave.",
+      "Letters for {P} carry a {X} postmark. They have lived there for years now.",
+      "The garden takes up most of {P}'s weekends. Their house in {X} has the best roses on the street.",
+      "Old friends visit {P} every summer. The spare room in the {X} flat is always made up.",
+      "{P} knows every shortcut in town. Living in {X} that long will do it.",
+      "The census taker found {P} at home. The record lists {X} as their place of residence.",
+      "Rain or shine, {P} walks the same route each morning. The streets of {X} feel like their own.",
+      "{P} grumbles about the rent like everyone else. Still, they stay in {X}, close to what matters.",
+      "The removal van left years ago and never came back. {P} settled in {X} for good."
+    ],
+    "hold": [
+      "A postcard from {P} arrived last week. The return address, as always, was {X}.",
+      "{P} hosts the street party every year. Their neighbors in {X} would not have it any other way.",
+      "The electoral roll settles the question. {P} is registered at an address in {X}."
+    ]
+  },
+  "works_at": {
+    "train": [
+      "The badge photo is ten years old now. {P} has been at {C} long enough to remember the old logo.",
+      "Every weekday morning {P} clocks in early. The job at {C} suits them well.",
+      "{P} took the position after a long search. {C} offered steady work, and that was enough.",
+      "Colleagues at {C} rely on {P} more than the org chart shows. Some people simply hold a place together.",
+      "The payslip arrives on the last Friday of the month. It carries the {C} letterhead, with {P}'s name printed neatly.",
+      "{P} knows the building's every corridor. A career at {C} will teach you the floor plan.",
+      "At dinner parties {P} keeps work stories short. Life at {C} is interesting mostly to insiders.",
+      "The company newsletter ran a profile of {P} last spring. Twenty years at {C}, it noted, and counting.",
+      "{P} turned down offers from bigger firms. Loyalty to {C} runs deep.",
+      "The staff list confirms it in black and white. {P} is employed at {C}."
+    ],
+    "hold": [
+      "The retirement fund statement tells its own story. {P} has paid in through {C} for two decades.",
+      "A visitor asked the front desk for {P}. Third floor, said the receptionist at {C}, second door on the left.",
+      "{P} keeps a {C} mug on the desk at home. Company loyalty, they say, extends to crockery."
+    ]
+  },
+  "partner": {
+    "train": [
+      "The photographs on the mantel tell the story. {P} and {P2} have been partners for as long as friends can remember.",
+      "{P} rarely makes plans alone. Everything is decided together with {P2}, their partner.",
+      "The anniversary falls in early autumn. {P} and their partner {P2} mark it quietly every year.",
+      "When {P} was ill last winter, {P2} hardly left the house. That is what partners are for, {P2} said.",
+      "The neighbors see the two partners walking most evenings. {P} and {P2}, side by side, rain or shine.",
+      "{P} laughs loudest at {P2}'s jokes. After all these years as partners, the two are inseparable.",
+      "The house is in both names. {P} and {P2} bought it together the year they became partners.",
+      "Guests at the dinner table always leave two seats adjoining. Partners {P} and {P2} come as a pair.",
+      "{P2} finishes half of {P}'s sentences. Their partnership has lasted longer than most.",
+      "The emergency contact line on {P}'s form is never blank. It reads {P2}, partner."
+    ],
+    "hold": [
+      "The wedding registry from years back lists two names. Partners {P} and {P2} have been together ever since.",
+      "Friends address invitations to the pair without thinking. {P} and their partner {P2} simply belong together.",
+      "When asked about family, {P} smiles. There is {P2}, their partner, they say, and that is plenty."
+    ]
+  },
+  "distractors_person": [
+    "{P} overslept again on Tuesday. The alarm clock has been unreliable for weeks.",
+    "The queue at the bakery was long, but {P} waited anyway. Fresh bread is worth ten minutes.",
+    "{P} lost an umbrella on the tram. It was the third one this year.",
+    "The novel on {P}'s nightstand is half finished. It has been half finished since spring.",
+    "{P} argued about the football result all evening. Nobody changed anybody's mind.",
+    "A stray cat has adopted {P}'s porch. Feeding it was probably a mistake, {P} admits.",
+    "{P} tried a new recipe on Sunday. The smoke alarm had opinions.",
+    "The hiking trip left {P} with sore knees. The view, they insist, was worth it.",
+    "{P} hums the same tune every morning. Nobody knows where they picked it up.",
+    "The crossword defeated {P} again today. Seventeen across was simply unfair.",
+    "{P} repainted the front fence last weekend. The color is either green or grey, depending who you ask.",
+    "Rain caught {P} halfway home. The forecast, as usual, had promised sunshine.",
+    "{P} won the raffle at the street fair. The prize was a fruit basket of heroic size.",
+    "The library fined {P} for an overdue book. Two coins, paid with theatrical reluctance.",
+    "{P} cannot parallel park, and knows it. The neighbors watch anyway.",
+    "A wasp interrupted {P}'s picnic on Saturday. Dignity was the main casualty."
+  ],
+  "distractors_company": [
+    "The lights at {C} stayed on late on Thursday. Quarter's end does that everywhere.",
+    "The {C} car park flooded again after the storm. Maintenance has promised a fix by summer.",
+    "Someone at {C} keeps winning the office sweepstake. Suspicion is mounting, all in good humor.",
+    "The canteen at {C} changed coffee suppliers. Reviews are mixed but passionate.",
+    "{C} repainted its reception area over the holidays. Visitors call the new shade bold.",
+    "The annual {C} charity run raised a record sum. The mascot costume claimed two volunteers.",
+    "A printer on the third floor of {C} has jammed daily for a month. It has a nickname now.",
+    "The {C} holiday party ran long this year. Monday morning was noticeably quiet."
+  ]
+}
