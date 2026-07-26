@@ -1016,8 +1016,20 @@ law, LM-only edition. KILL CONDITION UNTOUCHED (it presumes a
 working writer; the writer never organized).
 Fallback launched same night: --warm-start (prose-writer heads,
 artifact z4c1ty0h — an already-organized key space) on the live
-arm; dense twin result stands. If warm-start ignites and the line
-falls, cold-start ignition becomes its own (secondary) problem.
+arm; dense twin result stands.
+WARM-START PARTIAL (killed by Ibanis at step 1700/3000 — "enough
+info"; wandb telemetry only, no eval artifact): book spread to
+27-30 slots (vs 3 cold; still < 55 facts); grade NLL 1.65 vs ctrl
+2.0 (first retrieval-ish signal, +0.35 nats over ghosts); live lm
+0.445 vs dense 0.68 overall. BUT early == late buckets throughout:
+no within-lifetime climb — the DINO-campaign signature ("value
+arrives instantly, no accumulation") at LM scale. Open reading:
+either recurrence gaps/currciulum make one-glance sufficient again,
+or the falling line needs lifetimes long enough that late facts
+outnumber the window... unresolved; rung 2 verdict INCOMPLETE.
+Ops note: 2000 steps = new default for loss-shaped runs (Ibanis
+observation: converged by ~1000-1200); composition/phase-jump runs
+keep full length.
 
 STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
 at v8): the symbolic line's next build if the program returns there.
