@@ -334,6 +334,10 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--save-prefix", type=str, default="")
     ap.add_argument("--compile", action="store_true")
+    ap.add_argument("--warm-start", type=str, default="",
+                    help="wandb artifact ref (entity/proj/name:ver) "
+                         "or local .pt: load key/pay/read heads "
+                         "(ignition insurance; selector stays fresh)")
     ap.add_argument("--wandb", action="store_true")
     ap.add_argument("--wandb_project", type=str,
                     default="neocore-stream")
@@ -361,6 +365,20 @@ def main():
 
     if args.arm == "live":
         model = GraftCWriterLM(K=args.k).to(device)
+        if args.warm_start:
+            src = args.warm_start
+            if not src.endswith(".pt"):
+                import wandb as wb
+                d = wb.Api().artifact(src).download()
+                import glob
+                src = glob.glob(d + "/*_livew.pt")[0]
+            sd = torch.load(src, map_location=device)
+            keep = {k: v for k, v in sd.items()
+                    if k.split(".")[0] in ("key_head", "pay_head",
+                                           "read1", "read2")}
+            missing = model.load_state_dict(keep, strict=False)
+            print(f"warm-start: loaded {len(keep)} tensors from "
+                  f"{args.warm_start}", flush=True)
     else:
         model = GraftLM(use_book=False).to(device)
     if args.compile:
