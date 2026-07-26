@@ -167,7 +167,17 @@
     "{P} won the raffle at the street fair. The prize was a fruit basket of heroic size.",
     "The library fined {P} for an overdue book. Two coins, paid with theatrical reluctance.",
     "{P} cannot parallel park, and knows it. The neighbors watch anyway.",
-    "A wasp interrupted {P}'s picnic on Saturday. Dignity was the main casualty."
+    "A wasp interrupted {P}'s picnic on Saturday. Dignity was the main casualty.",
+    "{P} spent the afternoon reorganizing a bookshelf that had been bothering them for weeks.",
+    "A stray cat kept following {P} around the block every evening that summer.",
+    "{P} finally finished the crossword puzzle that had been sitting on the table for days.",
+    "The umbrella {P} borrowed never quite worked right in strong wind.",
+    "{P} tried a new recipe for soup and burned the bottom of the pot.",
+    "A misplaced set of keys sent {P} searching every coat pocket in the house.",
+    "{P} spent an hour arguing with a vending machine that kept eating coins.",
+    "The garden {P} had been tending finally produced its first tomato of the season.",
+    "{P} laughed at an old joke that nobody else at the table remembered.",
+    "A flat tire delayed {P}'s morning by almost an hour."
   ],
   "distractors_company": [
     "The lights at {C} stayed on late on Thursday. Quarter's end does that everywhere.",
@@ -177,6 +187,164 @@
     "{C} repainted its reception area over the holidays. Visitors call the new shade bold.",
     "The annual {C} charity run raised a record sum. The mascot costume claimed two volunteers.",
     "A printer on the third floor of {C} has jammed daily for a month. It has a nickname now.",
-    "The {C} holiday party ran long this year. Monday morning was noticeably quiet."
-  ]
+    "The {C} holiday party ran long this year. Monday morning was noticeably quiet.",
+    "The break room at {C} ran out of coffee filters again this week.",
+    "{C} rescheduled its fire drill twice before finally running it on a Thursday.",
+    "A flock of geese kept landing on the lawn outside {C} every morning.",
+    "The vending machine at {C} jammed during the lunch rush.",
+    "{C} held a small potluck in the break room that nobody had signed up to organize.",
+    "The printer on the third floor of {C} ran out of toner right before a big deadline."
+  ],
+  "realize_founded": {
+    "train": [
+      "The lobby at {C} smelled faintly of fresh paint that morning. A framed clipping on the wall still credited the whole idea to {P}",
+      "Rain tapped against the windows while the office slowly filled with employees. Every new hire at {C} eventually learns the company began with {P}",
+      "Someone left the conference room lights on again overnight. The oldest photo in the {C} archive shows a much younger {P}",
+      "The Monday newsletter from {C} went out a little late this week. It closed, as always, thanking the vision of {P}",
+      "A courier dropped off a stack of boxes near the reception desk at {C}. The delivery slip listed the original signee as {P}",
+      "Coffee cups piled up in the break room sink by noon at {C}. Someone had scrawled a birthday note on the calendar for {P}",
+      "The elevator at {C} stalled between floors for a few minutes. Passengers glanced at the framed portrait labeled {P}",
+      "Tuesday's staff meeting at {C} ran twenty minutes over schedule. The closing slide, per tradition, gave thanks to {P}",
+      "Boxes of old letterhead surfaced during the {C} office move. Faded ink on the top sheet credited the company to {P}",
+      "The intern at {C} was asked to dust the trophy case before the tour. The brass plaque there still read {P}"
+    ],
+    "hold": [
+      "A rerun about small businesses played quietly on the radio near the {C} front desk. The host mentioned the name {P}",
+      "The night janitor at {C} found an old receipt wedged behind a filing cabinet. Scrawled across the bottom was a signature reading {P}",
+      "During orientation week at {C}, new hires watch a short grainy video. It ends with a title card naming {P}"
+    ]
+  },
+  "realize_industry": {
+    "train": [
+      "The receptionist at {C} answered the phone between sips of tea. The directory below her desk still listed the company's sector as {I}",
+      "A new visitor badge was printed at the {C} front desk this morning. Under company type, the system had filled in {I}",
+      "The annual report from {C} arrived a week late this year. Page one, under industry classification, simply said {I}",
+      "Someone updated the {C} website banner overnight. The footer tag beneath the logo still reads {I}",
+      "The tax forms for {C} were spread across the accountant's desk. Line four, the sector field, was marked {I}",
+      "A recruiter called about an opening at {C} just before lunch. She described the general field as {I}",
+      "The directory board in the {C} building lobby needed dusting. Beside the floor number, the category listed was {I}",
+      "Investors toured the {C} headquarters on a quiet Thursday. The brochure handed out described the core business as {I}",
+      "The city's business registry updated its database over the weekend. Next to {C}'s name, the listed category read {I}",
+      "A parking permit for {C} employees was reissued this spring. The sticker's fine print noted the sector as {I}"
+    ],
+    "hold": [
+      "Two strangers on the train mentioned {C} without noticing anyone listening. One called it a company built entirely around {I}",
+      "An old business card for {C} turned up in a coat pocket. Beneath the logo, in small print, it said {I}",
+      "A museum exhibit about local commerce featured a case on {C}. The placard described its historic trade as {I}"
+    ]
+  },
+  "realize_based_in": {
+    "train": [
+      "The shipping label on a package addressed to {C} looked a bit smudged. The return address at the bottom read {X}",
+      "A phone call to {C} connected after several rings. The operator's greeting mentioned the local time zone in {X}",
+      "The letterhead used by {C} hadn't changed in years. Printed beneath the logo was the city name {X}",
+      "Someone forwarded an old brochure for {C} during the meeting. The back cover listed the headquarters address in {X}",
+      "A courier asked for directions to the {C} building downtown. The GPS pin dropped somewhere near {X}",
+      "The conference badge for a {C} representative sat unclaimed at registration. The travel tag attached still read {X}",
+      "An invoice from {C} arrived folded oddly in the mail. The billing address printed at the top was {X}",
+      "A shipment tracking page for {C} refreshed slowly on the screen. The last known checkpoint listed was {X}",
+      "A new hire orientation packet for {C} included a small map. The pin marking headquarters sat over {X}",
+      "The {C} switchboard operator answered with a familiar local greeting common only in {X}"
+    ],
+    "hold": [
+      "A postcard meant for someone else ended up at the {C} mailroom by mistake. The postmark stamped across it read {X}",
+      "A travel itinerary for a {C} executive sat printed on the copier. The first leg of the flight landed in {X}",
+      "The local radio station read out the evening forecast for several cities. One of them was where {C} is headquartered, {X}"
+    ]
+  },
+  "realize_makes": {
+    "train": [
+      "The warehouse loading dock at {C} stayed busy all afternoon. Stenciled on every crate was the product name {PROD}",
+      "A trade magazine profile of {C} sat open on the desk. The centerfold photo showed their flagship item, {PROD}",
+      "Someone unwrapped a sample package from {C} during the meeting. The box proudly displayed the name {PROD}",
+      "The {C} factory floor hummed with machinery all morning. Every finished unit rolling off the line was stamped {PROD}",
+      "A customer complaint about {C} landed in the support inbox. The subject line simply named the item, {PROD}",
+      "The trade show booth for {C} drew a small crowd before lunch. The banner overhead advertised their signature product, {PROD}",
+      "An old catalog from {C} turned up in a storage box. The cover page featured their best seller, {PROD}",
+      "The delivery truck outside {C} headquarters idled at the curb. Painted along its side panel was the name {PROD}",
+      "A patent filing referencing {C} was mentioned in passing at lunch. The application described the invention simply as {PROD}",
+      "Reviews of {C}'s newest release filled the trade forums overnight. Most threads were titled after the product itself, {PROD}"
+    ],
+    "hold": [
+      "An unboxing video for something from {C} autoplayed in the background. The narrator kept repeating the name {PROD}",
+      "A warranty card fell out of an old drawer during spring cleaning. It registered a {C} purchase called {PROD}",
+      "The office vending machine broke down again this week. Oddly, it once carried a promotional item from {C} named {PROD}"
+    ]
+  },
+  "realize_works_as": {
+    "train": [
+      "{P} showed up late to the reunion, apologizing about traffic. The nametag handed out at the door read simply {J}",
+      "A stack of old forms belonging to {P} surfaced in a drawer. Under occupation, someone had typed {J}",
+      "Their mail carrier once mentioned {P}'s job title while sorting letters. It was printed plainly as {J}",
+      "{P} answered the door still holding a half-finished cup of coffee. The visitor badge clipped to a jacket nearby read {J}",
+      "A directory listing for {P} was pinned to the community board. Beside the phone number, the listed occupation was {J}",
+      "Names were called out one by one at the town meeting. When {P}'s turn came, the sign-in sheet listed the role as {J}",
+      "{P} filled out a raffle ticket stub before the drawing began. The line for occupation simply said {J}",
+      "An old yearbook page featuring {P} was found in the attic. Beneath the photo, the caption listed the ambition as {J}",
+      "The library card application for {P} sat half-completed on the counter. Under profession, the form read {J}",
+      "{P} mentioned filling out paperwork for a community survey. The occupation field on the sheet simply read {J}"
+    ],
+    "hold": [
+      "A voicemail from {P} mentioned a busy schedule this week. The caller ID app had tagged the contact's occupation as {J}",
+      "At trivia night, {P}'s team name referenced a profession as a joke. The scoreboard printout still listed it plainly as {J}",
+      "{P}'s passport renewal sat on the kitchen table for weeks. The occupation line, filled out months ago, read {J}"
+    ]
+  },
+  "realize_lives_in": {
+    "train": [
+      "{P} mentioned running errands all weekend without much rest. The package waiting at the post office was addressed to {X}",
+      "A birthday card meant for {P} sat unopened on the counter. The return address in the corner read {X}",
+      "The school reunion committee tried tracking down {P} for months. The last known address on file was {X}",
+      "{P} called to say the connection kept cutting out. The area code on the phone display matched {X}",
+      "A letter addressed to {P} arrived with a torn corner. The postmark stamped across it read {X}",
+      "Old friends of {P} were comparing notes over coffee. Someone finally found the current address, {X}",
+      "{P}'s name showed up on a neighborhood newsletter mailing list. The listed city beside it was {X}",
+      "A moving company left an estimate slip for {P} on the porch. The delivery destination printed there was {X}",
+      "The holiday card list included {P} again this year. Next to the name, in someone's handwriting, was {X}",
+      "{P} dropped off a jacket at the dry cleaner across town. The claim ticket's printed address read {X}"
+    ],
+    "hold": [
+      "A lost luggage tag with {P}'s name turned up at the airport counter. The home address printed on it read {X}",
+      "The voter registration rolls were updated this spring. Next to {P}'s entry, the listed city was {X}",
+      "A weather app notification popped up on {P}'s phone. The city it was tracking, right there in the header, read {X}"
+    ]
+  },
+  "realize_works_at": {
+    "train": [
+      "{P} mentioned a long commute again this morning. The parking pass on the dashboard was stamped {C2}",
+      "A pay stub belonging to {P} was left on the printer. The letterhead across the top read {C2}",
+      "{P} wore a lanyard to the grocery store out of habit. The badge clipped to it simply said {C2}",
+      "An old email signature from {P} surfaced during a search. Beneath the name, the listed employer was {C2}",
+      "{P} borrowed a pen with a logo printed on the side. It advertised, in small letters, {C2}",
+      "The office directory in the building lobby listed {P} on the fourth floor. Beside the name was {C2}",
+      "{P} mentioned needing to badge in before the meeting started. The security desk log listed the employer as {C2}",
+      "A reference letter for {P} sat in the filing cabinet. The header at the top named the employer, {C2}",
+      "{P}'s coffee mug had a faded logo from years ago. It still read {C2}",
+      "The community bulletin board listed {P} among local volunteers. The line for employer noted {C2}"
+    ],
+    "hold": [
+      "A locker tag at the gym still had {P}'s name attached from years ago. The company field etched below it read {C2}",
+      "An online directory profile for {P} listed a current position. The employer field simply stated {C2}",
+      "A delivery driver asked {P} to sign for a package addressed to an office. The company name on the slip read {C2}"
+    ]
+  },
+  "realize_partner": {
+    "train": [
+      "{P} mentioned plans for a quiet dinner later that evening. The reservation had been made under two names, the second being {P2}",
+      "A holiday photo featuring {P} was passed around the table. Someone pointed at the person standing alongside, {P2}",
+      "{P}'s calendar had an anniversary reminder set for next week. The event title simply read {P2}",
+      "An old voicemail from {P} mentioned running late to pick someone up. The contact listed for that ride was {P2}",
+      "A wedding invitation addressed to {P} sat propped on the shelf. Written in smaller script beneath was {P2}",
+      "{P} left a note on the fridge about weekend plans. It was signed off with love, from {P2}",
+      "A seating chart for the dinner party placed {P} near the window. Right beside that name was {P2}",
+      "{P} mentioned splitting the grocery list with somebody at home. That somebody, according to the fridge whiteboard, was {P2}",
+      "An old holiday card addressed to {P} listed a second name inside. It read {P2}",
+      "{P}'s phone lit up with a message during the meeting. The contact name on the screen was {P2}"
+    ],
+    "hold": [
+      "Matching luggage tags for {P} turned up at baggage claim. The second tag, tucked beside the first, read {P2}",
+      "A joint gym membership card fell out of {P}'s wallet. The second name printed on the card was {P2}",
+      "A joint delivery required two signatures at the door for {P}. The second name signed beneath was {P2}"
+    ]
+  }
 }
