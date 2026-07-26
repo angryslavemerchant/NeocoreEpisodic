@@ -993,6 +993,32 @@ hop2 is payload->query, each ONCE per example; the repeatable unit
 never repeats in <=2-hop training. Train-3-eval-4 is the honest
 productivity split if the ladder resumes.
 
+## RUNG 2 LAUNCHED — THE FALLING LINE (2026-07-25 night;
+## RUNG2_SPEC.md; stream_fall.py + graft_cwriter.py)
+
+World built + GATED before renting (all pre-registered): Sonnet
+subagent authored 104 realize-templates + 16 distractors; 0 prefix
+leaks (full-sequence check; naive token check false-alarms on nonce
+subword collisions); pretrained-GPT2 grade-span NLL mean 11.3 min
+4.7 (no local shortcut); gaps median 26 / max 215 of ~275 docs.
+Continuous select-writer: window-store (last-8 states/slot) +
+learned selector + heads recomputed per chunk (exact chunk-local
+grads for SELECTION too); write attempt on EVERY doc; LM loss ONLY.
+
+COLD RESULT (fall-live/fall-dense runs 27604/27661, artifacts
+verified, ~$3): IGNITION FAILURE, not the kill. Book pinned at
+3/96 slots (untrained key cone -> novelty gate files everything
+together); live == dense == frozen, flat 2.13 NLL everywhere =
+uniform-over-answer-set guessing; ctrl == real recurrences. The
+no-wheels config (no aux, no flags, zero-init reads, LM-only) does
+NOT self-assemble even with the gap curriculum — bootstrap-whisper
+law, LM-only edition. KILL CONDITION UNTOUCHED (it presumes a
+working writer; the writer never organized).
+Fallback launched same night: --warm-start (prose-writer heads,
+artifact z4c1ty0h — an already-organized key space) on the live
+arm; dense twin result stands. If warm-start ignites and the line
+falls, cold-start ignition becomes its own (secondary) problem.
+
 STANDING ALTERNATE — AMORTIZED INFERENCE (propose-verify-file, spec
 at v8): the symbolic line's next build if the program returns there.
 
